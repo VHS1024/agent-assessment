@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+outputs/*
+!outputs/.gitkeep
+evidence/*
+!evidence/.gitkeep
+*.log
+__pycache__/
+.DS_Store
