@@ -1,0 +1,34 @@
+name: assessment-agent
+env_file: .env
+
+agents:
+  reviewer:
+    provider: codex
+    image: ghcr.io/chaitin/agent-compose-guest:latest
+    driver:
+      docker: {}
+    workspace:
+      provider: git
+      url: https://github.com/VHS1024/agent-assessment.git
+      ref: main
+      target: .
+    env:
+      OCTOBUS_BASE_URL: ${OCTOBUS_BASE_URL}
+      OCTOBUS_TOKEN: ${OCTOBUS_TOKEN}
+    system_prompt: |
+      你是安全分析 Agent。
+      先读取 knowledge/00_scope.md 和 knowledge/01_rules.md。
+      能够由脚本确定计算的内容必须调用脚本，不得凭空估计。
+      所有结论必须给出证据文件名；证据不足时输出 INCONCLUSIVE。
+      不得读取或输出未授权目标的敏感数据。
+    scheduler:
+      enabled: true
+      triggers:
+        - name: assessment-run
+          cron: "0 * * * *"
+          timezone: Asia/Shanghai
+          prompt: |
+            读取 data/fixtures/sample.json，
+            执行一次安全分析，
+            将结构化结果写入 outputs/result.json，
+            将过程证据写入 evidence/。
