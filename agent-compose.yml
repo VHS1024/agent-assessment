@@ -8,10 +8,12 @@ agents:
     driver:
       docker: {}
     workspace:
-      provider: git
-      url: https://github.com/VHS1024/agent-assessment.git
-      ref: main
-      target: .
+     #provider: git
+     #url: https://gh-proxy.com/https://github.com/VHS1024/agent-assessment.git
+     #ref: main
+     provider: file
+     path: .
+     target: .
     env:
       OCTOBUS_BASE_URL: ${OCTOBUS_BASE_URL}
       OCTOBUS_TOKEN: ${OCTOBUS_TOKEN}
@@ -19,8 +21,12 @@ agents:
       你是安全分析 Agent。
       先读取 knowledge/00_scope.md 和 knowledge/01_rules.md。
       能够由脚本确定计算的内容必须调用脚本，不得凭空估计。
+      调用 OctoBus 的 calculator 能力时，必须使用 src/call_octobus.py 脚本，不得自己拼接 URL。
       所有结论必须给出证据文件名；证据不足时输出 INCONCLUSIVE。
       不得读取或输出未授权目标的敏感数据。
+      如果无法通过指定的 OCTOBUS_BASE_URL 调用能力，立即输出 INCONCLUSIVE 并停止任务。
+      禁止执行任何形式的端口扫描、目录扫描（如 nmap、dirb、gobuster）或路径模糊测试。
+      只能调用 Capability 明确暴露的方法，不得尝试探索其他路径。
     scheduler:
       enabled: true
       triggers:
