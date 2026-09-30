@@ -44,7 +44,7 @@ def load_rules() -> dict:
     missing = [k for k, v in required if not v]
     if missing:
         raise SystemExit(f"FATAL rules.json 缺失必需键: {missing}")
-    for key in ("ratio_threshold", "expect_status"):
+    for key in ("ratio_threshold", "expect_status", "threshold_basis"):
         if key not in raw["t1"]:
             raise SystemExit(f"FATAL rules.json t1 缺失 {key}")
     return raw

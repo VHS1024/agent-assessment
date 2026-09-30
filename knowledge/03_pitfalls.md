@@ -56,3 +56,22 @@
 **误判场景**：热替换 calculator handler 时，用 `grep -c "CalculatorService/"` 输出 2（Add+Subtract 键都在文件里）判定「修复成功」——随后 `instance restart` 报 `health check failed: connection refused`，实例根本起不来。同一修复链上还连环踩了三个分层陷阱：① 官方示例包是 SDK 模式（require `@chaitin-ai/octobus-sdk`），旧 runtime 是裸 gRPC 模式且无该依赖——「字符串在文件里」≠「依赖可解析」，require 首行即崩；② 跨环境重建文件时丢失首行 shebang（hardening.go 注释原文 "Runtime entries are shebang scripts"，supervisor 直接 `exec.Command(entry)` 无 node 兜底）——755 + 无 shebang = 内核 ENOEXEC「exec format error」；③ `node --check` 对 `.patched` 扩展名报 ERR_UNKNOWN_FILE_EXTENSION——语法检查对象必须是落位后的目标文件名。
 
 **对策（已实现）**：① **四层验证链**——文件层（grep 键存在）→ 语法层（`node --check` 对落位后的 .js）→ 进程层（`instance restart` 的 health check + `tail stderr.log`，supervisor.go:286-298 把进程 stderr 落盘到 `DataDir/instances/<id>/stderr.log`）→ 端到端层（curl 实弹带回显），单层绿不算通；② **真实报错优先**——`logs --instance` 返回的是网关审计流水而非进程 stderr，崩溃栈必须读 stderr.log 或前台手动跑入口脚本；③ **防御式兼容**——跨环境替换代码时避免硬编码库的命名空间挂载路径（如 `proto.grpc.calculator.v1`），改「标准路径优先 + 结果树深搜 `.service` 属性兜底」的双通道解析，对 proto-loader/grpc-js 版本行为差异免疫。延伸视角：与「声明的规则未被实际使用」风险同类——「声明的修复未被端到端验证」，单点证据不能替代链路证据。
+**前提一：长度与哈希必须取自「完整响应体」，不能取自 excerpt。**
+`body_excerpt` 只是完整 body 的前 N 字节展示副本；若用 excerpt 长度做判据，当响应体被截断时会掩盖差异 → 假阴性。
+`body_length` 取自 `buf.length`、`body_sha256` 对完整 `buf` 计算，二者共同支撑「逐字节一致」这一强判据。
+
+**前提二：「逐字节一致」不能只看长度。** 等长但内容不同（sha 不同）既不是干净修复、也不构成可用注入，
+必须转 INCONCLUSIVE 交人工——单看长度会把「等长的语义替换」误判成 PATCHED。
+
+**不可作为判据的字段及其原因**：
+
+| 字段 | 原因 | 处置 |
+|---|---|---|
+| `headers` 中的 `Date` / `Set-Cookie` / `Server` / `X-Request-Id` | 每次请求都变，纳入全等比较会把「已修复」误判成「未修复」（假阳性） | R-STRIP-01 剥离后再比 |
+| `elapsed_ms` | 网络抖动，与修复状态无因果关系 | 不参与任何判定 |
+| `status` 单值 | 靶场对「无注入标记」的请求返回 400，与「已修复的统一 403」不同；只看 status 会把探针打偏当成已修复 | 仅 200/403 进判定（R-T1-02） |
+| `body_excerpt` 长度 | 见前提一，截断即失真 | 只用于关键字匹配与展示 |
+
+**失效场景（本靶场已验证）**：若目标响应含时间戳/CSRF token 等动态内容，即便漏洞已修复，`ratio` 也不会归零——
+此时只按长度判 PATCHED 必然漏报。故 PATCHED 的判据是「ratio==0 **且** sha256 全等」，两条同时成立才判；
+中间灰区一律 INCONCLUSIVE。**失败方向一律偏保守：证据不足不硬判。**
