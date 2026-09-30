@@ -1,0 +1,14 @@
+{
+ "status": 200,
+ "headers": {
+  "content-length": "27",
+  "content-type": "application/json",
+  "date": "Wed, 30 Sep 2026 09:03:13 GMT",
+  "server": "vulnlab/1.0 Python/3.10.12"
+ },
+ "body_length": 27,
+ "body_sha256": "fae340d3cd274d83010953417c0868602130ef986766a471248b03faef65b9c8",
+ "body_excerpt": "{\"result\":\"empty\",\"rows\":0}",
+ "elapsed_ms": 45,
+ "error": ""
+}

@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "allowedHosts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "出口白名单：host 或 host:port 形式。探针仅允许请求名单内目标，不在名单直接拒绝——网关方法授权之外的第二层出口控制。"
+    }
+  }
+}

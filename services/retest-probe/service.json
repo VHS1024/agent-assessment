@@ -1,0 +1,12 @@
+{
+  "schema": "chaitin.octobus.service.v1",
+  "name": "retest-probe",
+  "displayName": "Retest Probe",
+  "description": "HTTP probe capability for vulnerability retest. Executes allowlisted HTTP requests and returns deterministic response measurements (status/length/sha256/excerpt).",
+  "proto": {
+    "roots": ["proto"],
+    "files": ["proto/retest.proto"]
+  },
+  "configSchema": "config.schema.json",
+  "secretSchema": "secret.schema.json"
+}

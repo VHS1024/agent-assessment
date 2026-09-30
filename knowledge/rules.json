@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "updated": "2026-09-30",
+  "note": "本文件是 pipeline.py 的唯一判据来源（机器可读）。人类可读版见 01_rules.md，两者规则 ID 一一对应。pipeline 启动时加载全部键，缺失键直接报错退出——保证「声明的规则被代码真实消费」。",
+  "header_strip": ["date", "server", "set-cookie", "x-request-id", "x-powered-by", "connection", "keep-alive"],
+  "t1": {
+    "rule_id": "R-T1-01",
+    "ratio_threshold": 0.5,
+    "expect_status": 200,
+    "gray_zone": "INCONCLUSIVE",
+    "note": "双阈值：ratio==0 → PATCHED；>=0.5 → VULNERABLE；(0,0.5) 灰区 → INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性"
+  },
+  "t2": {
+    "rule_id": "R-T2-01",
+    "block_status": 403,
+    "block_marker": "WAF-BLOCK",
+    "reflect_marker": "onerror=alert(1)",
+    "expect_status": 200,
+    "full_block_verdict": "WAF_FULL_BLOCK",
+    "note": "四态：双拦 = WAF_FULL_BLOCK（拦截面完整仅为真实修复的必要条件，不并入 PATCHED）"
+  },
+  "t3": {
+    "rule_id": "R-T3-01",
+    "forbidden_status": 403
+  },
+  "ratio_rule": {
+    "rule_id": "R-CALC-01",
+    "delta_source": "octobus_calculator_subtract",
+    "ratio_scope": "local_division",
+    "why": "差值经网关 Subtract 留审计；比例属纯算术（网关无 Divide 方法），在已审计差值上本地计算，见 03_pitfalls.md P-04"
+  },
+  "strip_rule": {
+    "rule_id": "R-STRIP-01",
+    "why": "响应头动态字段（Date/Set-Cookie 等）不参与任何比对；响应体本身逐字节确定，sha256 直接可比"
+  },
+  "error_policy": {
+    "rule_id": "R-ERR-01",
+    "on_transport_error": "INCONCLUSIVE",
+    "why": "探针传输层失败（网关失败/白名单拒绝/超时/拒连）不推断漏洞状态，判 INCONCLUSIVE 转人工复核。本值被 pipeline._inconclusive 真实消费：修改此值会直接改变报告输出"
+  }
+}

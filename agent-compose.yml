@@ -12,21 +12,21 @@ agents:
      #url: https://gh-proxy.com/https://github.com/VHS1024/agent-assessment.git
      #ref: main
      provider: file
+     mode: mount
      path: .
      target: .
     env:
       OCTOBUS_BASE_URL: ${OCTOBUS_BASE_URL}
-      OCTOBUS_TOKEN: ${OCTOBUS_TOKEN}
+      OCTOBUS_TOKEN_RETESTER: ${OCTOBUS_TOKEN_RETESTER}
     system_prompt: |
-      你是安全分析 Agent。
-      先读取 knowledge/00_scope.md 和 knowledge/01_rules.md。
-      能够由脚本确定计算的内容必须调用脚本，不得凭空估计。
-      调用 OctoBus 的 calculator 能力时，必须使用 src/call_octobus.py 脚本，不得自己拼接 URL。
-      所有结论必须给出证据文件名；证据不足时输出 INCONCLUSIVE。
-      不得读取或输出未授权目标的敏感数据。
-      如果无法通过指定的 OCTOBUS_BASE_URL 调用能力，立即输出 INCONCLUSIVE 并停止任务。
-      禁止执行任何形式的端口扫描、目录扫描（如 nmap、dirb、gobuster）或路径模糊测试。
-      只能调用 Capability 明确暴露的方法，不得尝试探索其他路径。
+      你是漏洞复测 Agent。任务：依据 data/vulns.json 的历史漏洞记录，对本地靶场完成复测并输出判定报告。
+      执行纪律：
+      1. 先读取 knowledge/01_rules.md（判定规则）与 knowledge/03_pitfalls.md（误判经验），再读取 data/vulns.json。
+      2. 执行 python3 src/pipeline.py 完成探测与判定——全部数值（长度、差值、比例、哈希）由脚本与网关产生，禁止自行估算或心算任何数值。
+      3. 所有能力调用（探针、calculator）必须经 src/call_octobus.py，不得自行拼接 URL 或绕过网关直连目标。
+      4. 读取 outputs/report.json，按漏洞逐条撰写 outputs/summary.md：判定结论 + 关键度量 + 证据文件名。证据不足或判定为 INCONCLUSIVE 时如实说明，不得推断。
+      5. 禁止执行端口扫描、目录扫描（nmap/dirb/gobuster）或路径模糊测试；只调用 capset 明确授权的方法。
+      6. 无法经 OCTOBUS_BASE_URL 调用能力时，立即输出 INCONCLUSIVE 并停止。
     scheduler:
       enabled: true
       triggers:
@@ -34,7 +34,7 @@ agents:
           cron: "0 * * * *"
           timezone: Asia/Shanghai
           prompt: |
-            读取 data/fixtures/sample.json，
-            执行一次安全分析，
-            将结构化结果写入 outputs/result.json，
-            将过程证据写入 evidence/。
+            读取 data/vulns.json 与 knowledge/01_rules.md，
+            执行 python3 src/pipeline.py 完成三条历史漏洞的复测，
+            阅读 outputs/report.json，撰写 outputs/summary.md 结论摘要。
+            禁止自行估算任何数值。

@@ -1,0 +1,27 @@
+syntax = "proto3";
+package retest.v1;
+
+// 漏洞复测探针能力：受控 HTTP 请求 + 确定性响应度量。
+// 设计原则：探针只做「测量」，不做「判定」——判定由 Agent 侧确定性代码（src/pipeline.py）完成，
+// 保证 LLM/网关/判定脚本三层职责分离，且每次探测在 OctoBus 留有审计记录。
+service RetestService {
+  rpc ProbeHttp(ProbeHttpRequest) returns (ProbeHttpResponse);
+}
+
+message ProbeHttpRequest {
+  string url = 1;                    // 目标 URL（必须命中实例配置 allowedHosts 出口白名单）
+  string method = 2;                 // 默认 GET
+  map<string, string> headers = 3;   // 附加请求头
+  string body = 4;                   // 请求体（GET/HEAD 忽略）
+  int32 timeout_ms = 5;              // 超时，默认 8000
+}
+
+message ProbeHttpResponse {
+  int32 status = 1;                  // HTTP 状态码
+  map<string, string> headers = 2;   // 响应头（原样，动态字段由判定侧剥离）
+  int32 body_length = 3;             // 响应体字节数
+  string body_sha256 = 4;            // 响应体 SHA-256（用于一致性比对，如 IDOR 统一 403）
+  string body_excerpt = 5;           // 响应体前 200 字符（控制字符已消毒，供特征串检查）
+  double elapsed_ms = 6;             // 耗时
+  string error = 7;                  // 非空 = 传输层失败（白名单拒绝/DNS/超时/拒连），此时 status=0；空 = 探测成功
+}

@@ -1,0 +1,42 @@
+{
+  "instances": [
+    {
+      "ConfigJSON": {
+        "label": "primary"
+      },
+      "ConfigSHA256": "e18faf8b4ca5d83e70c7fe80b767789b21ac122f844f9012951a26ca09216d2a",
+      "CreatedAt": "2026-09-29T02:38:21.883976715Z",
+      "Enabled": true,
+      "HasSecret": true,
+      "ID": "calculator-test",
+      "ListenAddr": "127.0.0.1:36515",
+      "Name": "calculator-test",
+      "NodeEntry": "bin/calculator.js",
+      "PID": 17,
+      "SecretSHA256": "******",
+      "ServiceID": "calculator",
+      "Status": "running",
+      "UpdatedAt": "2026-09-30T09:54:00.508855799Z"
+    },
+    {
+      "ConfigJSON": {
+        "allowedHosts": [
+          "172.17.0.1:8081"
+        ]
+      },
+      "ConfigSHA256": "94b1ceecf401fedc523503adbf46053e0c9c825328f67748bd9b51bdf8387800",
+      "CreatedAt": "2026-09-30T05:37:35.477315193Z",
+      "Enabled": true,
+      "HasSecret": false,
+      "ID": "retest-test",
+      "ListenAddr": "127.0.0.1:40769",
+      "Name": "retest-test",
+      "NodeEntry": "bin/probe.js",
+      "PID": 15,
+      "SecretSHA256": "******",
+      "ServiceID": "retest-probe",
+      "Status": "running",
+      "UpdatedAt": "2026-09-30T09:54:00.502562825Z"
+    }
+  ]
+}

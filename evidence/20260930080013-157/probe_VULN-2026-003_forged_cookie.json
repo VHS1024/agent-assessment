@@ -1,0 +1,14 @@
+{
+ "status": 403,
+ "headers": {
+  "content-length": "9",
+  "content-type": "text/plain; charset=utf-8",
+  "date": "Wed, 30 Sep 2026 08:00:13 GMT",
+  "server": "vulnlab/1.0 Python/3.10.12"
+ },
+ "body_length": 9,
+ "body_sha256": "78342a0905a72ce44da083dcb5d23b8ea0c16992ba2a82eece97e033d76ba3d3",
+ "body_excerpt": "Forbidden",
+ "elapsed_ms": 43,
+ "error": ""
+}

@@ -1,0 +1,3 @@
+NAMES           STATUS
+octobus         Up About a minute
+agent-compose   Up About a minute
