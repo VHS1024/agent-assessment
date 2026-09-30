@@ -1,0 +1,13 @@
+{
+ "status": 200,
+ "headers": {
+  "content-length": "72",
+  "content-type": "application/json",
+  "date": "Wed, 30 Sep 2026 12:00:07 GMT",
+  "server": "vulnlab/1.0 Python/3.10.12"
+ },
+ "bodyLength": 72,
+ "bodySha256": "38e272955835c5e57213e10d0cf200e0355056faae80799db8e9dfbaad1cb189",
+ "bodyExcerpt": "{\"id\":1,\"user\":\"admin\",\"role\":\"user\",\"balance\":\"1000\",\"status\":\"active\"}",
+ "elapsedMs": 50
+}

@@ -6,6 +6,7 @@
 id_rsa
 id_ed25519
 *.log
+!evidence/**/octobus_calls.log
 __pycache__/
 .DS_Store
 .env

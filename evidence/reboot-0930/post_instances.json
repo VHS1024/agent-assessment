@@ -9,14 +9,14 @@
       "Enabled": true,
       "HasSecret": true,
       "ID": "calculator-test",
-      "ListenAddr": "127.0.0.1:44345",
+      "ListenAddr": "127.0.0.1:45031",
       "Name": "calculator-test",
       "NodeEntry": "bin/calculator.js",
-      "PID": 16,
+      "PID": 15,
       "SecretSHA256": "******",
       "ServiceID": "calculator",
       "Status": "running",
-      "UpdatedAt": "2026-09-30T09:56:16.5169617Z"
+      "UpdatedAt": "2026-09-30T11:41:42.792870047Z"
     },
     {
       "ConfigJSON": {
@@ -29,14 +29,14 @@
       "Enabled": true,
       "HasSecret": false,
       "ID": "retest-test",
-      "ListenAddr": "127.0.0.1:43247",
+      "ListenAddr": "127.0.0.1:44169",
       "Name": "retest-test",
       "NodeEntry": "bin/probe.js",
-      "PID": 15,
+      "PID": 14,
       "SecretSHA256": "******",
       "ServiceID": "retest-probe",
       "Status": "running",
-      "UpdatedAt": "2026-09-30T09:56:16.487645196Z"
+      "UpdatedAt": "2026-09-30T11:41:42.83434326Z"
     }
   ]
 }

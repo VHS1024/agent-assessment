@@ -1,0 +1,20 @@
+{
+  "capsets": [
+    {
+      "CreatedAt": "2026-09-29T02:38:43.890257919Z",
+      "Description": "",
+      "Enabled": true,
+      "ID": "dev",
+      "Name": "DevAgent",
+      "UpdatedAt": "2026-09-29T02:38:43.890257919Z"
+    },
+    {
+      "CreatedAt": "2026-09-30T06:05:28.479068531Z",
+      "Description": "",
+      "Enabled": true,
+      "ID": "retester",
+      "Name": "Retest Agent",
+      "UpdatedAt": "2026-09-30T06:05:28.479068531Z"
+    }
+  ]
+}

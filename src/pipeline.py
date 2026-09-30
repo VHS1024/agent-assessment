@@ -57,6 +57,28 @@ def _failed(probe: dict) -> bool:
     return bool(probe.get("error"))
 
 
+def normalize_probe(probe: dict) -> dict:
+    """把探针响应归一化为判定器使用的 snake_case 字段（返回副本，不改动原对象）。
+
+    OctoBus Connect/JSON 模式按 protojson 规范将 body_length 等字段编码为
+    lowerCamelCase（bodyLength）；不同网关/库版本命名不一致（见 03_pitfalls.md
+    P-09「接口契约与实现漂移」）。判定器只认 proto 声明的 snake_case，这里做
+    防御式双命名兼容——只重排键名，不改变任何数值来源与判定语义。
+    """
+    aliases = {
+        "bodyLength": "body_length",
+        "bodySha256": "body_sha256",
+        "bodyExcerpt": "body_excerpt",
+        "elapsedMs": "elapsed_ms",
+    }
+    out = dict(probe)
+    for camel, snake in aliases.items():
+        if snake not in out and camel in out:
+            out[snake] = out[camel]
+    out.setdefault("error", "")
+    return out
+
+
 def judge_t1(probe_true: dict, probe_false: dict, rules: dict) -> dict:
     """布尔盲注：1=1 与 1=2 响应差异显著 → VULNERABLE；一致 → PATCHED；灰区 → INCONCLUSIVE。"""
     t1 = rules["t1"]
@@ -228,7 +250,7 @@ def main() -> int:
             for name, probe in steps:
                 probe["evidence_file"] = save_evidence(vuln["id"], name, probe)
             judge = JUDGES[vuln["type"]]
-            outcome = judge(steps[0][1], steps[1][1], rules)
+            outcome = judge(normalize_probe(steps[0][1]), normalize_probe(steps[1][1]), rules)
             outcome["evidence"] = [p[1]["evidence_file"] for p in steps]
         except Exception as exc:  # noqa: BLE001 兜底：单漏洞失败不影响整轮报告产出
             outcome = _inconclusive(rules, f"pipeline 异常: {type(exc).__name__}: {exc}")
