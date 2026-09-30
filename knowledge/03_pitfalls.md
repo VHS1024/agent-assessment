@@ -42,6 +42,9 @@
 
 **对策（已实现）**：入口脚本 `chmod 755`（本地包已同步 755，重导入不复发）；排障纪律——报错文案里的动词（exec/copy/open）先于假设定位到源码调用点，再对症下药，而不是按「权限问题」直觉轮流撒 chmod。
 
+
+> **现场证据**：`evidence/20260930110008-139/`——该轮 6 次 ProbeHttp 全部成功（status 200/403）但 `octobus_calls.log` 仅 6 行、**无 Subtract**，报告为 INCONCLUSIVE。原因即本坑：网关命名切换后`body_length` 取不到值，`judge_t1` 在减法前抛 KeyError，被 `main()` 兜底捕获。修复即 `normalize_probe()`。
+> **判定意义**：该轮证明失败方向是保守的（报 INCONCLUSIVE 而非误判 PATCHED），与 R-T1-02「探针打偏不得伪装成已修复」同一防线。
 ## P-09 能力声明面 ≠ 运行时实现面：三层对齐才算能力可用
 
 **误判场景**：`capset select-method` 授权 Subtract 成功 → 想当然认为「能调」。实际预置 calculator 包 proto **声明**了 Add+Subtract（service list 可见），但运行时 handler 只注册 Add——每次 Subtract 调用都被实例回 HTTP 400 `unimplemented: The server does not implement the method Subtract`（网关审计 404 NotFound）。授权通过只证明「声明面 ∩ 授权面」非空，「实现面」是独立第三层。

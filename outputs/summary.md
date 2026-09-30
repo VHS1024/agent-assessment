@@ -1,50 +1,49 @@
 # 漏洞复测结论摘要
 
-- 运行批次 run_id：`20260930124015-146`
-- 判据版本 rules_version：`1.0`
-- 生成时间：2026-09-30T12:40:16+0000
-- 数据来源：`outputs/report.json`（判定结果）+ `evidence/20260930124015-146/`（探针原始响应、`octobus_calls.log`）
-- 靶场：`http://172.17.0.1:8081`（全部调用经 OctoBus 网关 `OCTOBUS_BASE_URL=http://octobus:9000` 转发）
+- run_id: `20260930140005-128`
+- 生成时间: 2026-09-30T14:00:06+0000
+- 判据版本: rules.json `1.0`（判定由 `src/pipeline.py` 确定性执行，全部数值经 OctoBus 网关/脚本产生）
+- 汇总: total=3，VULNERABLE=1，SURFACE_PATCH=1，WAF_FULL_BLOCK=0，PATCHED=1，INCONCLUSIVE=0
 
-## 总览
+> 本文所有数值均摘自 `outputs/report.json` 与 `evidence/20260930140005-128/`，未做任何估算或推断。
 
-report.json 汇总计数：`total=3, VULNERABLE=1, SURFACE_PATCH=1, WAF_FULL_BLOCK=0, PATCHED=1, INCONCLUSIVE=0`。
+---
 
-| 漏洞 ID | 类型 | 判定 | 依据规则 |
-|---|---|---|---|
-| VULN-2026-001 用户查询接口布尔盲注 | boolean_blind | VULNERABLE | R-T1-01 / R-CALC-01 |
-| VULN-2026-002 搜索接口反射型 XSS | reflection_diff | SURFACE_PATCH | R-T2-01 |
-| VULN-2026-003 管理接口水平越权 | idem_forge | PATCHED | R-T3-01 / R-STRIP-01 |
+## VULN-2026-001 用户查询接口布尔盲注 —— 判定: VULNERABLE
 
-## VULN-2026-001 用户查询接口布尔盲注 —— VULNERABLE
+- 规则: R-T1-01（双阈值）；差值经 R-CALC-01 网关 Subtract 留审计
+- 关键度量: `len_true=72`，`len_false=27`，`delta=45`（网关 Subtract），`ratio=0.625` ≥ 阈值 `0.5`
+- 响应体: `sha_true=38e272955835…` vs `sha_false=fae340d3cd27…`，`sha_identical=false`
+- 结论依据: `1=1` 返回完整记录（`{"id":1,"user":"admin",…}`），`1=2` 返回空结果（`{"result":"empty","rows":0}`），两 payload 响应长度差比例达 0.625，超过攻击阈值 → 注入仍有效。
+- 两个探针状态码均为 200，符合 `expect_status`，排除 R-T1-02「探针打偏」。
+- 证据文件:
+  - `evidence/20260930140005-128/probe_VULN-2026-001_tautology.json`
+  - `evidence/20260930140005-128/probe_VULN-2026-001_contradiction.json`
 
-- 结论：漏洞仍未修复（VULNERABLE）。`1=1` 返回完整记录、`1=2` 返回空记录，两响应体差异显著且超过攻击阈值。
-- 关键度量（取自 `outputs/report.json` 该条 `metrics`）：`len_true=72`、`len_false=27`、`delta=45`（经 OctoBus `calculator.v1.CalculatorService/Subtract` 计算，审计入参 `left=72, right=27`，见 `octobus_calls.log` 第 003 行）、`ratio=0.625`、`threshold=0.5`；`sha_true` 前缀 `38e272955835`、`sha_false` 前缀 `fae340d3cd27`。
-- 判据：R-T1-01 双阈值——ratio ≥ 0.5 判 VULNERABLE（仅 ratio==0 判 PATCHED，`(0, 0.5)` 为灰区）。本次 ratio `0.625` ≥ `0.5`，直接判 VULNERABLE。
-- 证据文件：
-  - `evidence/20260930124015-146/probe_VULN-2026-001_tautology.json`（status `200`、`bodyLength=72`、体为完整记录 `{"id":1,"user":"admin","role":"user","balance":"1000","status":"active"}`）
-  - `evidence/20260930124015-146/probe_VULN-2026-001_contradiction.json`（status `200`、`bodyLength=27`、体为 `{"result":"empty","rows":0}`）
+## VULN-2026-002 搜索接口反射型 XSS —— 判定: SURFACE_PATCH（表层变更）
 
-## VULN-2026-002 搜索接口反射型 XSS —— SURFACE_PATCH（表层变更）
+- 规则: R-T2-01（拦截 vs 修复区分）
+- 关键度量: `waf_active=true`，`bypass_reflected=true`，`literal_status=403`，`bypass_status=200`
+- 字面量探针被拦: `<script>` → 403，响应体 `WAF-BLOCK: keyword policy violation (rule: xss-keyword-001)`
+- 变体探针未被拦: `<img src=x onerror=alert(1)>` 原样反射，响应体为 `<html><body>Search results for: <img src=x onerror=alert(1)> | end</body></html>`
+- 结论依据: 历史处置仅上线「WAF 拦截 `<script` 关键字」，仅覆盖单一关键字；标签替换变体仍原样反射、可触达漏洞本体 → 属表层变更，非真实修复（未证明输出转义/代码层修复）。
+- 证据文件:
+  - `evidence/20260930140005-128/probe_VULN-2026-002_literal_script.json`
+  - `evidence/20260930140005-128/probe_VULN-2026-002_variant_onerror.json`
 
-- 结论：表层变更（SURFACE_PATCH）。历史处置声称的「WAF 拦截 `<script` 关键字」确实生效，但拦截面仅覆盖单一字面特征；`<img onerror>` 变体仍被原样反射，漏洞本体仍可触达，**不构成真实修复**。
-- 关键度量（取自 `outputs/report.json` 该条 `metrics`）：`waf_active=true`、`bypass_reflected=true`、`literal_status=403`、`bypass_status=200`；`bypass_excerpt=<html><body>Search results for: <img src=x onerror=alert(1)> | end</body></html>`。
-- 判据：R-T2-01 四态——字面量被拦（403 + 命中 `WAF-BLOCK`）且变体仍原样反射 → SURFACE_PATCH（关键字拦截 ≠ 漏洞修复）。本轮未出现变体也被拦的情况，故不判 WAF_FULL_BLOCK，也无 INCONCLUSIVE。
-- 证据文件：
-  - `evidence/20260930124015-146/probe_VULN-2026-002_literal_script.json`（status `403`、`bodyLength=59`、体含 `WAF-BLOCK: keyword policy violation (rule: xss-keyword-001)`）
-  - `evidence/20260930124015-146/probe_VULN-2026-002_variant_onerror.json`（status `200`、`bodyLength=80`、原样反射 `onerror=alert(1)`）
+## VULN-2026-003 管理接口水平越权 —— 判定: PATCHED
 
-## VULN-2026-003 管理接口水平越权 —— PATCHED
+- 规则: R-T3-01；响应头比对按 R-STRIP-01 剥离动态头
+- 关键度量: `plain_status=403`，`forged_status=403`，`sha_identical=true`，`headers_identical=true`
+- 响应体: 两次请求均为 `Forbidden`（`content-length=9`，`sha256=78342a0905a7…`），逐字节一致
+- 结论依据: 普通请求与伪造 Cookie（`admin=1`）请求均走同一条 403 拒绝路径，剥离 `Date/Server` 等动态头后响应头一致 → 统一鉴权中间件生效。
+- 证据文件:
+  - `evidence/20260930140005-128/probe_VULN-2026-003_plain.json`
+  - `evidence/20260930140005-128/probe_VULN-2026-003_forged_cookie.json`
 
-- 结论：已修复（PATCHED）。普通请求与伪造 Cookie（`admin=1`）请求均统一返回 403，且响应逐字节一致——符合统一鉴权中间件修复的架构特征。
-- 关键度量（取自 `outputs/report.json` 该条 `metrics`）：`plain_status=403`、`forged_status=403`、`sha_identical=true`、`headers_identical=true`（响应头已按 R-STRIP-01 剥离 `date`/`server` 等动态字段后比对）。两次响应均 `body_length=9`、`body_sha256=78342a0905a72ce44da083dcb5d23b8ea0c16992ba2a82eece97e033d76ba3d3`、`body_excerpt=Forbidden`。
-- 证据文件：
-  - `evidence/20260930124015-146/probe_VULN-2026-003_plain.json`
-  - `evidence/20260930124015-146/probe_VULN-2026-003_forged_cookie.json`
+---
 
-## 执行说明与边界（如实声明）
+## 审计与边界声明
 
-- 出口合规：本轮全部能力调用（探针 `retest.v1.RetestService/ProbeHttp`、calculator `calculator.v1.CalculatorService/Subtract`）均经 `src/call_octobus.py` 唯一出口访问 `OCTOBUS_BASE_URL`；未自行拼接 URL、未绕过网关、未做端口/目录扫描或路径模糊测试。本摘要所有数值均取自 `outputs/report.json` 与证据文件，未做任何估算或心算。
-- 判定完整性：三条漏洞探针传输层均无 `error`（`evidence/20260930124015-146/octobus_calls.log` 中 7 次调用 `ok=true`），判定结果为确定结论，无 INCONCLUSIVE 需转人工。
-- 可复现性：探针矩阵固定在 `src/pipeline.py`，判据版本化于 `knowledge/rules.json`（`rules_version=1.0`），靶场响应逐字节确定；重跑差异来自目标状态变化而非工具随机性。
-- 边界声明（P-07）：T2 的拦截特征串（`WAF-BLOCK`）与判据同源，仅对本受控靶场确定，对真实 WAF 拦截页不具泛化性；泛化需将 `rules.json` 扩展为 per-target 指纹规则集。
+- 全部能力调用经 `src/call_octobus.py` 网关出口，业务请求 id `20260930140005-128-001..007`，三方对账留痕见 `evidence/20260930140005-128/octobus_calls.log`（7 次调用全部 `ok=true`，无传输层失败，故无 R-ERR-01 触发的 INCONCLUSIVE）。
+- VULN-2026-002 的 WAF 特征串 `WAF-BLOCK` 与判据 `rules.json t2.block_marker` 同源（P-07 受控靶场自证边界）。该判定对本靶场确定，对真实第三方 WAF 拦截页不具泛化性——泛化需将特征串替换为可配置的 per-target 指纹规则集。
