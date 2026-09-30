@@ -18,7 +18,7 @@
 
 - SSH：`ssh <用户名>@<服务器IP> -p <端口>`（运维访问公钥已就位 `authorized_keys`，权限 700/600）
 - agent-compose daemon：`127.0.0.1:7410`（仅本机）
-- OctoBus daemon：`172.17.0.1:9000`（docker0 网关地址，仅内网）
+- OctoBus daemon：监听 `172.17.0.1:9000`（docker0 网关地址，仅内网）；**guest 容器内通过 docker 网络服务名访问，即 `http://octobus:9000`**
 - vulnlab 靶场：`172.17.0.1:8081`（仅内网）
 - 项目目录：`~/agent-assessment`
 
@@ -47,6 +47,17 @@ sudo tail -10 /var/log/vulnlab.log                              # 靶场访问�
 ```
 
 **预期结果**：`VULN-2026-001 → VULNERABLE`（盲注未修复）、`VULN-2026-002 → SURFACE_PATCH`（WAF 只拦关键字，变体仍反射）、`VULN-2026-003 → PATCHED`（统一 403 逐字节一致）。
+
+## 3.5 单元测试（离线可跑）
+
+判定逻辑不依赖网络与网关（`calculator Subtract` 已打桩），可在任意机器验证（需 Python ≥ 3.10）：
+
+```bash
+pip install -r requirements.txt
+python3 -m pytest tests/ -q
+```
+
+覆盖：三类判定器全部判定位、R-ERR-01 传输失败、R-STRIP-01 头剥离、`rules.json` 必需键校验、探针矩阵 URL 构造、灰区/等长不同体等边界。
 
 ## 4. 三条历史漏洞与三态判定
 
@@ -95,9 +106,9 @@ sudo cp vulnlab/vulnlab.py /opt/vulnlab/vulnlab.py
 sudo cp vulnlab/vulnlab.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now vulnlab
 
-# ⑧ 项目层 .env（三键，令牌来自 ⑥）
+# ⑧ 项目层 .env（两键，令牌来自 ⑥；示例见 .env.example）
 cat > .env <<'EOF'
-OCTOBUS_BASE_URL=http://172.17.0.1:9000
+OCTOBUS_BASE_URL=http://octobus:9000
 OCTOBUS_TOKEN_RETESTER=<粘贴⑥生成的令牌>
 EOF
 
@@ -111,6 +122,8 @@ cd ~/agent-assessment && ac up
 agent-assessment/
 ├── agent-compose.yml          # Agent 定义（provider/driver/workspace/env/scheduler）
 ├── RUNBOOK.md                 # 实施运行手册（Phase 2-6，逐条命令+成功/异常判据）
+├── .env.example               # 环境变量模板（仅变量名，无真实令牌；.env 不入库）
+├── requirements.txt           # 单测依赖（pytest，仅开发期需要）
 ├── .env                       # OCTOBUS_BASE_URL / OCTOBUS_TOKEN_RETESTER（不入库）
 ├── services/retest-probe/     # 自研 OctoBus 能力包：受控 HTTP 探针
 │   ├── service.json           #   包清单（schema chaitin.octobus.service.v1）
@@ -126,7 +139,7 @@ agent-assessment/
 │   ├── 01_rules.md            # 人类可读规则（规则 ID 与 json 一一对应）
 │   └── 03_pitfalls.md         # 误判经验与工程取舍
 ├── data/vulns.json            # 三条历史漏洞记录（复测依据）
-├── tests/                     # 判定器单测（不依赖网络）
+├── tests/                     # 判定器单测（不依赖网络与网关，calculator Subtract 打桩）
 ├── outputs/report.json        # 复测报告（每轮覆盖）
 └── evidence/<run_id>/         # 每轮证据：探针原始响应 + octobus_calls.log
 ```

@@ -32,10 +32,13 @@ def load_rules() -> dict:
     """加载机器可读判据。任一必需键缺失直接 Fatal——确保规则真实被消费而非仅作声明。"""
     raw = json.loads((REPO / "knowledge" / "rules.json").read_text(encoding="utf-8"))
     required = [
+        ("version", raw.get("version")),
         ("header_strip", raw.get("header_strip")),
         ("t1", raw.get("t1")),
         ("t2", raw.get("t2")),
         ("t3", raw.get("t3")),
+        ("ratio_rule", raw.get("ratio_rule")),
+        ("strip_rule", raw.get("strip_rule")),
         ("error_policy", raw.get("error_policy")),
     ]
     missing = [k for k, v in required if not v]
@@ -91,18 +94,24 @@ def judge_t1(probe_true: dict, probe_false: dict, rules: dict) -> dict:
     delta = call_octobus.subtract(probe_true["body_length"], probe_false["body_length"],
                                   RUN_ID, _next_seq())
     ratio = round(abs(delta) / max(probe_true["body_length"], 1), 4)
-    if ratio == 0:
-        verdict = "PATCHED"                       # 双 payload 响应逐字节一致
-    elif ratio >= t1["ratio_threshold"]:
+    # PATCHED 的判据是「响应体逐字节一致」，故必须比对 sha256 而不只是长度：
+    # 等长但内容不同（sha 不同）既不是干净修复、也不构成可用注入，转人工而非判 PATCHED。
+    same_body = probe_true["body_sha256"] == probe_false["body_sha256"]
+    if ratio >= t1["ratio_threshold"]:
         verdict = "VULNERABLE"
+    elif ratio == 0 and same_body:
+        verdict = "PATCHED"
     else:
-        return _inconclusive(rules, f"ratio {ratio} 落在灰区 (0, {t1['ratio_threshold']})",
-                             probe_true, probe_false, rule_ref=t1["rule_id"])
+        return _inconclusive(
+            rules,
+            f"未达攻击阈值且响应体不一致（ratio={ratio}, sha 相等={same_body}）",
+            probe_true, probe_false, rule_ref=t1["rule_id"])
     return {
         "verdict": verdict,
         "metrics": {
             "len_true": probe_true["body_length"], "len_false": probe_false["body_length"],
             "delta": delta, "ratio": ratio, "threshold": t1["ratio_threshold"],
+            "sha_identical": same_body,
             "sha_true": probe_true["body_sha256"][:12], "sha_false": probe_false["body_sha256"][:12],
         },
         "rule_refs": [t1["rule_id"], rules["ratio_rule"]["rule_id"]],
@@ -263,7 +272,7 @@ def main() -> int:
     report = {
         "run_id": RUN_ID,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "rules_version": json.loads((REPO / "knowledge" / "rules.json").read_text(encoding="utf-8"))["version"],
+        "rules_version": rules["version"],
         "results": results,
         "summary": {
             "total": len(results),

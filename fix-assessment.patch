@@ -1,0 +1,224 @@
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..eb5c76d
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,5 @@
++# 复制为 .env 后填入真实值；.env 已被 .gitignore 排除，不要提交。
++# OctoBus 网关地址（guest 容器内经 docker 网络服务名访问，与 call_octobus._base() 一致）
++OCTOBUS_BASE_URL=http://octobus:9000
++# capset retester 的访问令牌（由 `octobus capset add-token ... --token-stdin` 生成，仅存 .env 与 OctoBus 库）
++OCTOBUS_TOKEN_RETESTER=replace-with-your-token
+diff --git a/README.md b/README.md
+index bc538d6..f4d62c7 100644
+--- a/README.md
++++ b/README.md
+@@ -18,7 +18,7 @@
+ 
+ - SSH：`ssh <用户名>@<服务器IP> -p <端口>`（运维访问公钥已就位 `authorized_keys`，权限 700/600）
+ - agent-compose daemon：`127.0.0.1:7410`（仅本机）
+-- OctoBus daemon：`172.17.0.1:9000`（docker0 网关地址，仅内网）
++- OctoBus daemon：监听 `172.17.0.1:9000`（docker0 网关地址，仅内网）；**guest 容器内通过 docker 网络服务名访问，即 `http://octobus:9000`**
+ - vulnlab 靶场：`172.17.0.1:8081`（仅内网）
+ - 项目目录：`~/agent-assessment`
+ 
+@@ -48,6 +48,17 @@ sudo tail -10 /var/log/vulnlab.log                              # 靶场访问
+ 
+ **预期结果**：`VULN-2026-001 → VULNERABLE`（盲注未修复）、`VULN-2026-002 → SURFACE_PATCH`（WAF 只拦关键字，变体仍反射）、`VULN-2026-003 → PATCHED`（统一 403 逐字节一致）。
+ 
++## 3.5 单元测试（离线可跑）
++
++判定逻辑不依赖网络与网关（`calculator Subtract` 已打桩），可在任意机器验证（需 Python ≥ 3.10）：
++
++```bash
++pip install -r requirements.txt
++python3 -m pytest tests/ -q
++```
++
++覆盖：三类判定器全部判定位、R-ERR-01 传输失败、R-STRIP-01 头剥离、`rules.json` 必需键校验、探针矩阵 URL 构造、灰区/等长不同体等边界。
++
+ ## 4. 三条历史漏洞与三态判定
+ 
+ | 漏洞 | 类型 | 靶场状态 | 判定路径 |
+@@ -95,9 +106,9 @@ sudo cp vulnlab/vulnlab.py /opt/vulnlab/vulnlab.py
+ sudo cp vulnlab/vulnlab.service /etc/systemd/system/
+ sudo systemctl daemon-reload && sudo systemctl enable --now vulnlab
+ 
+-# ⑧ 项目层 .env（三键，令牌来自 ⑥）
++# ⑧ 项目层 .env（两键，令牌来自 ⑥；示例见 .env.example）
+ cat > .env <<'EOF'
+-OCTOBUS_BASE_URL=http://172.17.0.1:9000
++OCTOBUS_BASE_URL=http://octobus:9000
+ OCTOBUS_TOKEN_RETESTER=<粘贴⑥生成的令牌>
+ EOF
+ 
+@@ -111,6 +122,8 @@ cd ~/agent-assessment && ac up
+ agent-assessment/
+ ├── agent-compose.yml          # Agent 定义（provider/driver/workspace/env/scheduler）
+ ├── RUNBOOK.md                 # 实施运行手册（Phase 2-6，逐条命令+成功/异常判据）
++├── .env.example               # 环境变量模板（仅变量名，无真实令牌；.env 不入库）
++├── requirements.txt           # 单测依赖（pytest，仅开发期需要）
+ ├── .env                       # OCTOBUS_BASE_URL / OCTOBUS_TOKEN_RETESTER（不入库）
+ ├── services/retest-probe/     # 自研 OctoBus 能力包：受控 HTTP 探针
+ │   ├── service.json           #   包清单（schema chaitin.octobus.service.v1）
+@@ -126,7 +139,7 @@ agent-assessment/
+ │   ├── 01_rules.md            # 人类可读规则（规则 ID 与 json 一一对应）
+ │   └── 03_pitfalls.md         # 误判经验与工程取舍
+ ├── data/vulns.json            # 三条历史漏洞记录（复测依据）
+-├── tests/                     # 判定器单测（不依赖网络）
++├── tests/                     # 判定器单测（不依赖网络与网关，calculator Subtract 打桩）
+ ├── outputs/report.json        # 复测报告（每轮覆盖）
+ └── evidence/<run_id>/         # 每轮证据：探针原始响应 + octobus_calls.log
+ ```
+diff --git a/data/fixtures/sample.json b/data/fixtures/sample.json
+deleted file mode 100644
+index c11e8df..0000000
+--- a/data/fixtures/sample.json
++++ /dev/null
+@@ -1,6 +0,0 @@
+-{
+-  "target": "https://example.test/api/item?id=1",
+-  "baseline_length": 1200,
+-  "observed_length": 1450,
+-  "note": "本地合成的演示样本，不含真实目标数据"
+-}
+diff --git a/knowledge/01_rules.md b/knowledge/01_rules.md
+index 3270263..42cf721 100644
+--- a/knowledge/01_rules.md
++++ b/knowledge/01_rules.md
+@@ -14,9 +14,9 @@
+ - 构造 `1=1`（真）与 `1=2`（假）两个 payload 打同一接口；
+ - 差值 = 真响应长度 − 假响应长度（经 OctoBus calculator Subtract 计算，留审计）；
+ - 比例 = |差值| / 真响应长度；
+-- **比例 = 0（逐字节一致）→ PATCHED；≥ 0.5 → VULNERABLE；(0, 0.5) 灰区 → INCONCLUSIVE 转人工**。
++- **比例 ≥ 0.5 → VULNERABLE；比例 = 0 且响应体 SHA-256 相等（逐字节一致）→ PATCHED；其余情况（灰区、或长度相同但内容不同）→ INCONCLUSIVE 转人工**。
+ 
+-**判据理由**：0.5 是保守阈值——盲注的「真/假」页面通常一个是完整记录、一个是空记录，长度差远超一半；比例 0 才与「参数化修复后两页面逐字节一致」的文档语义一致；灰区（响应明显不同但差不到攻击阈值）既不是干净修复也不是可用注入，交给人工而不是硬猜。
++**判据理由**：0.5 是保守阈值——盲注的「真/假」页面通常一个是完整记录、一个是空记录，长度差远超一半。PATCHED 的语义是「两 payload 响应逐字节一致」，因此必须同时满足**长度相同且 body_sha256 相等**；只比长度会把「等长但内容不同」误判为已修复，这是复测里典型的假阴性来源。灰区（响应明显不同但差不到攻击阈值）既不是干净修复也不是可用注入，交给人工而不是硬猜。
+ 
+ **R-T1-02 探针打偏防护**：靶场对不含 `1=1`/`1=2` 标记的请求返回 400——若 payload 因编码/网关问题未按预期到达，假探针表现为状态码异常 → INCONCLUSIVE，从结构上堵死「打偏被误判为已修复」的假阴性通道。
+ 
+diff --git a/knowledge/rules.json b/knowledge/rules.json
+index 66b5bbb..e7a56d2 100644
+--- a/knowledge/rules.json
++++ b/knowledge/rules.json
+@@ -8,7 +8,7 @@
+     "ratio_threshold": 0.5,
+     "expect_status": 200,
+     "gray_zone": "INCONCLUSIVE",
+-    "note": "双阈值：ratio==0 → PATCHED；>=0.5 → VULNERABLE；(0,0.5) 灰区 → INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性"
++    "note": "双阈值：ratio==0 且 body sha256 相等（逐字节一致）→ PATCHED；>=0.5 → VULNERABLE；其余（含等长但内容不同）→ INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性"
+   },
+   "t2": {
+     "rule_id": "R-T2-01",
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..33d44ec
+--- /dev/null
++++ b/requirements.txt
+@@ -0,0 +1,4 @@
++# 开发/测试依赖（运行期 Agent 不需要：判定管线仅用 Python 标准库）
++# 运行环境要求 Python >= 3.10（src/call_octobus.py 使用了 `dict | None` 联合类型语法；
++# 线上 guest 容器为 Python 3.11）
++pytest>=8.0
+diff --git a/src/call_octobus.py b/src/call_octobus.py
+index d4815d8..043d05e 100644
+--- a/src/call_octobus.py
++++ b/src/call_octobus.py
+@@ -19,11 +19,14 @@ from pathlib import Path
+ REPO = Path(__file__).resolve().parent.parent
+ EVIDENCE_DIR = REPO / "evidence"
+ 
+-DEFAULT_BASE = "http://172.17.0.1:9000"  # octobus 容器绑定 docker0 网关地址
+-
+-
+ def _base() -> str:
+-    return os.environ.get("OCTOBUS_BASE_URL", DEFAULT_BASE).rstrip("/")
++    # guest 容器内经 docker 网络服务名访问 octobus（如 http://octobus:9000），
++    # 地址必须由 .env 显式提供，与 _token() 同为 fail-fast。
++    # 不做静默回退：回退到不可达地址只会产生难排查的探针传输失败（R-ERR-01）。
++    base = (os.environ.get("OCTOBUS_BASE_URL") or "").strip()
++    if not base:
++        raise RuntimeError("缺少 OCTOBUS_BASE_URL 环境变量（OctoBus 网关地址，如 http://octobus:9000）")
++    return base.rstrip("/")
+ 
+ 
+ def _token() -> str:
+diff --git a/src/pipeline.py b/src/pipeline.py
+index e210616..9dda1df 100644
+--- a/src/pipeline.py
++++ b/src/pipeline.py
+@@ -32,10 +32,13 @@ def load_rules() -> dict:
+     """加载机器可读判据。任一必需键缺失直接 Fatal——确保规则真实被消费而非仅作声明。"""
+     raw = json.loads((REPO / "knowledge" / "rules.json").read_text(encoding="utf-8"))
+     required = [
++        ("version", raw.get("version")),
+         ("header_strip", raw.get("header_strip")),
+         ("t1", raw.get("t1")),
+         ("t2", raw.get("t2")),
+         ("t3", raw.get("t3")),
++        ("ratio_rule", raw.get("ratio_rule")),
++        ("strip_rule", raw.get("strip_rule")),
+         ("error_policy", raw.get("error_policy")),
+     ]
+     missing = [k for k, v in required if not v]
+@@ -69,18 +72,24 @@ def judge_t1(probe_true: dict, probe_false: dict, rules: dict) -> dict:
+     delta = call_octobus.subtract(probe_true["body_length"], probe_false["body_length"],
+                                   RUN_ID, _next_seq())
+     ratio = round(abs(delta) / max(probe_true["body_length"], 1), 4)
+-    if ratio == 0:
+-        verdict = "PATCHED"                       # 双 payload 响应逐字节一致
+-    elif ratio >= t1["ratio_threshold"]:
++    # PATCHED 的判据是「响应体逐字节一致」，故必须比对 sha256 而不只是长度：
++    # 等长但内容不同（sha 不同）既不是干净修复、也不构成可用注入，转人工而非判 PATCHED。
++    same_body = probe_true["body_sha256"] == probe_false["body_sha256"]
++    if ratio >= t1["ratio_threshold"]:
+         verdict = "VULNERABLE"
++    elif ratio == 0 and same_body:
++        verdict = "PATCHED"
+     else:
+-        return _inconclusive(rules, f"ratio {ratio} 落在灰区 (0, {t1['ratio_threshold']})",
+-                             probe_true, probe_false, rule_ref=t1["rule_id"])
++        return _inconclusive(
++            rules,
++            f"未达攻击阈值且响应体不一致（ratio={ratio}, sha 相等={same_body}）",
++            probe_true, probe_false, rule_ref=t1["rule_id"])
+     return {
+         "verdict": verdict,
+         "metrics": {
+             "len_true": probe_true["body_length"], "len_false": probe_false["body_length"],
+             "delta": delta, "ratio": ratio, "threshold": t1["ratio_threshold"],
++            "sha_identical": same_body,
+             "sha_true": probe_true["body_sha256"][:12], "sha_false": probe_false["body_sha256"][:12],
+         },
+         "rule_refs": [t1["rule_id"], rules["ratio_rule"]["rule_id"]],
+@@ -241,7 +250,7 @@ def main() -> int:
+     report = {
+         "run_id": RUN_ID,
+         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+-        "rules_version": json.loads((REPO / "knowledge" / "rules.json").read_text(encoding="utf-8"))["version"],
++        "rules_version": rules["version"],
+         "results": results,
+         "summary": {
+             "total": len(results),
+diff --git a/tests/test_pipeline.py b/tests/test_pipeline.py
+index 74f45d3..4a68f86 100644
+--- a/tests/test_pipeline.py
++++ b/tests/test_pipeline.py
+@@ -70,6 +70,16 @@ def test_t1_gray_zone_inconclusive(rules, monkeypatch):
+     assert out["rule_refs"] == ["R-T1-01"]  # 灰区归因到判定规则，非传输错误
+ 
+ 
++def test_t1_equal_length_diff_body_inconclusive(rules, monkeypatch):
++    # 长度相同但响应体不同（sha 不同）：既非干净修复也非可用注入 → INCONCLUSIVE，
++    # 不得因 ratio==0 就判 PATCHED（R-T1-01 的 PATCHED 语义是逐字节一致）
++    monkeypatch.setattr(pipeline.call_octobus, "subtract", lambda l, r, rid, seq: l - r)
++    out = pipeline.judge_t1(_probe(length=100, sha="a" * 64),
++                            _probe(length=100, sha="b" * 64), rules)
++    assert out["verdict"] == "INCONCLUSIVE"
++    assert out["rule_refs"] == ["R-T1-01"]
++
++
+ def test_t1_status_mismatch_inconclusive(rules):
+     # 假探针打偏：靶场对无注入标记返回 400 → 状态异常 → INCONCLUSIVE（非 PATCHED）
+     out = pipeline.judge_t1(_probe(length=140), _probe(status=400, length=40), rules)

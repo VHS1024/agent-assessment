@@ -8,7 +8,7 @@
     "ratio_threshold": 0.5,
     "expect_status": 200,
     "gray_zone": "INCONCLUSIVE",
-    "note": "双阈值：ratio==0 → PATCHED；>=0.5 → VULNERABLE；(0,0.5) 灰区 → INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性"
+    "note": "双阈值：ratio==0 且 body sha256 相等（逐字节一致）→ PATCHED；>=0.5 → VULNERABLE；其余（含等长但内容不同）→ INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性"
   },
   "t2": {
     "rule_id": "R-T2-01",

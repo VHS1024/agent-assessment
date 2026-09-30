@@ -1,6 +1,0 @@
-{
-  "target": "https://example.test/api/item?id=1",
-  "baseline_length": 1200,
-  "observed_length": 1450,
-  "note": "本地合成的演示样本，不含真实目标数据"
-}

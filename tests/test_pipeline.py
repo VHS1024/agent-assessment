@@ -70,6 +70,16 @@ def test_t1_gray_zone_inconclusive(rules, monkeypatch):
     assert out["rule_refs"] == ["R-T1-01"]  # 灰区归因到判定规则，非传输错误
 
 
+def test_t1_equal_length_diff_body_inconclusive(rules, monkeypatch):
+    # 长度相同但响应体不同（sha 不同）：既非干净修复也非可用注入 → INCONCLUSIVE，
+    # 不得因 ratio==0 就判 PATCHED（R-T1-01 的 PATCHED 语义是逐字节一致）
+    monkeypatch.setattr(pipeline.call_octobus, "subtract", lambda l, r, rid, seq: l - r)
+    out = pipeline.judge_t1(_probe(length=100, sha="a" * 64),
+                            _probe(length=100, sha="b" * 64), rules)
+    assert out["verdict"] == "INCONCLUSIVE"
+    assert out["rule_refs"] == ["R-T1-01"]
+
+
 def test_t1_status_mismatch_inconclusive(rules):
     # 假探针打偏：靶场对无注入标记返回 400 → 状态异常 → INCONCLUSIVE（非 PATCHED）
     out = pipeline.judge_t1(_probe(length=140), _probe(status=400, length=40), rules)

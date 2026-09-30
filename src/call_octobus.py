@@ -19,11 +19,14 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 EVIDENCE_DIR = REPO / "evidence"
 
-DEFAULT_BASE = "http://172.17.0.1:9000"  # octobus 容器绑定 docker0 网关地址
-
-
 def _base() -> str:
-    return os.environ.get("OCTOBUS_BASE_URL", DEFAULT_BASE).rstrip("/")
+    # guest 容器内经 docker 网络服务名访问 octobus（如 http://octobus:9000），
+    # 地址必须由 .env 显式提供，与 _token() 同为 fail-fast。
+    # 不做静默回退：回退到不可达地址只会产生难排查的探针传输失败（R-ERR-01）。
+    base = (os.environ.get("OCTOBUS_BASE_URL") or "").strip()
+    if not base:
+        raise RuntimeError("缺少 OCTOBUS_BASE_URL 环境变量（OctoBus 网关地址，如 http://octobus:9000）")
+    return base.rstrip("/")
 
 
 def _token() -> str:
