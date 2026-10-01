@@ -1,6 +1,6 @@
 {
- "run_id": "20260930222438-28464",
- "generated_at": "2026-09-30T22:24:38+0800",
+ "run_id": "20261001000008-143",
+ "generated_at": "2026-10-01T00:00:08+0000",
  "rules_version": "1.0",
  "results": [
   {
@@ -23,8 +23,8 @@
     "R-CALC-01"
    ],
    "evidence": [
-    "evidence/20260930222438-28464/probe_VULN-2026-001_tautology.json",
-    "evidence/20260930222438-28464/probe_VULN-2026-001_contradiction.json"
+    "evidence/20261001000008-143/probe_VULN-2026-001_tautology.json",
+    "evidence/20261001000008-143/probe_VULN-2026-001_contradiction.json"
    ]
   },
   {
@@ -43,8 +43,8 @@
     "R-T2-01"
    ],
    "evidence": [
-    "evidence/20260930222438-28464/probe_VULN-2026-002_literal_script.json",
-    "evidence/20260930222438-28464/probe_VULN-2026-002_variant_onerror.json"
+    "evidence/20261001000008-143/probe_VULN-2026-002_literal_script.json",
+    "evidence/20261001000008-143/probe_VULN-2026-002_variant_onerror.json"
    ]
   },
   {
@@ -63,8 +63,8 @@
     "R-STRIP-01"
    ],
    "evidence": [
-    "evidence/20260930222438-28464/probe_VULN-2026-003_plain.json",
-    "evidence/20260930222438-28464/probe_VULN-2026-003_forged_cookie.json"
+    "evidence/20261001000008-143/probe_VULN-2026-003_plain.json",
+    "evidence/20261001000008-143/probe_VULN-2026-003_forged_cookie.json"
    ]
   }
  ],
