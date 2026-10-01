@@ -12,11 +12,11 @@
 | OctoBus 网关 | 能力唯一出口 | capset 方法级授权 + 全程审计留痕 + 探针出口白名单 |
 | pipeline.py（确定性脚本） | 全部判定逻辑 | 判据唯一来源 knowledge/rules.json，启动加载、缺失即 Fatal |
 
-一句话：**LLM 负责「想」，网关负责「管」，脚本负责「判」**——判定不经过任何概率环节，同一输入永远得到同一结论。
+判定逻辑我没有交给模型：取数、比对、算比例全在 `src/pipeline.py` 里，判据写在 `knowledge/rules.json`，LLM 只负责读记录和调度。同一份输入跑多少次，结论都一样。
 
 ## 2. 登录信息
 
-- SSH：`ssh <用户名>@<服务器IP> -p <端口>`（运维访问公钥已就位 `authorized_keys`，权限 700/600）
+- SSH：登录地址 / 用户名 / 端口已随提交信息单独提供（不在公开仓库中公示服务器入口）；运维访问公钥已就位 `authorized_keys`，权限 700/600
 - agent-compose daemon：`127.0.0.1:7410`（仅本机）
 - OctoBus daemon：监听 `172.17.0.1:9000`（docker0 网关地址，仅内网）；**guest 容器内通过 docker 网络服务名访问，即 `http://octobus:9000`**
 - vulnlab 靶场：`172.17.0.1:8081`（仅内网）
@@ -46,6 +46,8 @@ docker exec octobus octobus logs --capset retester --tail 10   # 网关审计
 sudo tail -10 /var/log/vulnlab.log                              # 靶场访问日志（UA 可见探针来源）
 ```
 
+**定时触发**：scheduler 常驻，不需要人工调用。`ac scheduler ls` 可查触发器，`ls evidence/ | tail -5` 能看到每半小时自动落盘的留痕。
+
 **预期结果**：`VULN-2026-001 → VULNERABLE`（盲注未修复）、`VULN-2026-002 → SURFACE_PATCH`（WAF 只拦关键字，变体仍反射）、`VULN-2026-003 → PATCHED`（统一 403 逐字节一致）。
 
 ## 3.5 单元测试（离线可跑）
@@ -67,7 +69,9 @@ python3 -m pytest tests/ -q
 | VULN-2026-002 反射 XSS | reflection_diff | **表层变更**：`<script>` 被 WAF 403，但 `<img onerror>` 变体仍原样反射 | 双探针：拦截存在 + 变体可达 → SURFACE_PATCH |
 | VULN-2026-003 水平越权 | idem_forge | **已修复**：伪造 Cookie 与普通请求均统一 403、响应逐字节一致 | SHA-256 + 剥离动态头后全等 → PATCHED |
 
-「表层变更」态是三态判定的设计要点：**判定不看「有没有拦截动作」，看「变体是否仍可触达漏洞本体」**——WAF 关键字拦截是最常见的表层修复。判定器还支持第四态 `WAF_FULL_BLOCK`（字面量与变体均被拦）：拦截面完整只是真实修复的必要条件，单列不并入 PATCHED（见 knowledge/01_rules.md R-T2-01）。
+「表层变更」是三态判定的设计要点。有拦截动作不等于修好了，关键是变体还能不能打到漏洞本体：WAF 关键字拦截就是最常见的一种「看起来修了」。判定器还支持第四态 `WAF_FULL_BLOCK`（字面量与变体均被拦）：拦截面完整只是真实修复的必要条件，单列不并入 PATCHED（见 knowledge/01_rules.md R-T2-01）。
+
+**证据格式约定**：`evidence/<run_id>/probe_*.json` 保存网关原样响应（Connect/JSON 下遵循 protojson 的 lowerCamelCase 命名，如 `bodyLength`），不做事后改写；判定层读取时经 `normalize_probe()` 归一到 proto 声明的 snake_case（见 `03_pitfalls.md` P-11）。早期轮次（07:25–10:00）因网关命名尚未切换而呈现 snake_case，属同一约定的历史形态。
 
 ## 4.5 从零部署（可复制粘贴）
 
@@ -146,22 +150,20 @@ agent-assessment/
 
 ## 6. calculator 链路定位（为何保留）
 
-calculator 是本项目第一个接入 OctoBus 的能力，**有意保留**，定位有三：
+calculator 是本项目最早接进 OctoBus 的能力，本来可以拆掉，留着的理由有三个：
 
 1. **算术审计载体**：盲注判定的长度差值经 `calculator.v1.CalculatorService/Subtract` 计算——确定性计算也过网关留审计，是 5.1.2「LLM 与脚本分工」的可审计实现，而非口头原则；
 2. **capset 最小授权演示**：`retester` capset 对 retest-test 授权全量方法、对 calculator-test **仅授权 Subtract 一个方法**（`--no-all-methods` + `select-method`）——「按角色而非按服务授权」的活示例；
 3. **金丝雀**：已验证的最小链路，新能力包异常时可二分定位「网关问题 vs 包问题」。
 
-它不参与业务判定路径的核心逻辑（只承担差值这一步），不是装饰性组件。
 
 ## 7. 安全边界
 
 - **网关方法级授权**：capset `retester` 白名单到单个方法（ProbeHttp、Subtract）；
 - **Agent 行为边界**：system_prompt 明令禁止端口/目录扫描与路径模糊测试，仅允许调用 capset 授权方法；网关不可达时输出 INCONCLUSIVE 并停止，不降级、不绕行；
 - **探针出口白名单**：retest-probe 实例 config `allowedHosts=["172.17.0.1:8081"]`，fail-closed——白名单外的目标一律拒绝（网关授权之外的第二层出口控制）；
-- **绕网关检测（含实测记录）**：靶场日志中 `direct-or-other` 共 4 笔，源 IP 均为宿主机自身（`172.30.158.34`，`ip -4 addr` 可验），系运维/人工探活（`history` 中可见对应 curl，如 `curl -o /dev/null -w '%{http_code}' '.../api/user?id=1%20AND%201%3D1'`）；Agent（guest，`172.18.0.x`）与 OctoBus 容器（`172.17.0.2`）在 `direct-or-other` 中**零出现**。该机制为「检测」而非「阻断」——宿主机本身具备直连能力，绕过会被标记而非被拒绝。
+- **绕网关检测**：Agent（guest，`172.18.0.x`）与 OctoBus 容器（`172.17.0.2`）在靶场日志的 `direct-or-other` 中**零出现**，业务请求全部走网关。日志另有 4 笔 `direct-or-other`，源 IP 为宿主机自身（`172.30.158.34`），是部署期人工探活，非 Agent 行为。该机制只检测、不阻断：宿主机本身具备直连能力，绕过会被标记而非被拒绝。
 - **探针 UA**：固定 `octobus-retest-probe/1.0`，靶场访问日志与 OctoBus 审计日志逐笔可对账，guest 直连靶场会以 `direct-or-other` 标记暴露；
-- **证据格式约定**：`evidence/<run_id>/probe_*.json` 保存**网关原样响应**（Connect/JSON 下遵循 protojson 的 lowerCamelCase 命名，如 `bodyLength`），不做事后改写；判定层读取时经 `normalize_probe()` 归一到 proto 声明的 snake_case（见 `03_pitfalls.md` P-11）。早期轮次（07:25–10:00）因网关命名尚未切换而呈现 snake_case，属同一约定的历史形态。
 - **端口边界**：三服务均绑定 127.0.0.1 / 172.17.0.1，不对公网暴露；
 - **凭据**：`.env` 不入库；capset token 经 stdin 生成；git 历史经全量扫描无密钥残留（`git log --all -p` 正则 0 命中）。
 

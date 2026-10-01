@@ -128,7 +128,7 @@ echo "$TOKEN" | docker exec -i octobus octobus capset add-token retester reteste
 sed -i '/^OCTOBUS_TOKEN_RETESTER=/d' ~/agent-assessment/.env   (清理旧行，防重复/防残留坏值)
 echo "OCTOBUS_TOKEN_RETESTER=$TOKEN" >> ~/agent-assessment/.env   (写入真实令牌——必须双引号让 $TOKEN 展开)
 grep -oE '^[A-Z_]+' ~/agent-assessment/.env | sort        (变量名核查，不显示值)
-curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://172.17.0.1:9000/capsets/retester/connect/calculator-test/calculator.v1.CalculatorService/Subtract" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"left":1450,"right":1200}'   (令牌预检——真弹一发 calculator Subtract)
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "http://172.17.0.1:9000/capsets/retester/connect/calculator-test/calculator.v1.CalculatorService/Subtract" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"left":1,"right":0}'   (令牌预检——真弹一发 calculator Subtract)
 cd ~/agent-assessment && ac up                            (重新应用项目——yml 与 env 有变更)
 ```
 

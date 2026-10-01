@@ -112,8 +112,3 @@ def _append_call_log(run_id: str, record: dict) -> None:
     d.mkdir(parents=True, exist_ok=True)
     with open(d / "octobus_calls.log", "a", encoding="utf-8") as fh:
         fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-
-if __name__ == "__main__":
-    rid = "manual-" + time.strftime("%Y%m%d%H%M%S")
-    print(json.dumps(subtract(1450, 1200, rid, 1), ensure_ascii=False))
