@@ -9,7 +9,6 @@ id_ed25519
 !evidence/**/octobus_calls.log
 __pycache__/
 .DS_Store
-.env
 *.pyc
 
 .pytest_cache/

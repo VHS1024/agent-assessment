@@ -16,7 +16,7 @@
 
 ## 2. 登录信息
 
-- SSH：登录地址 / 用户名 / 端口已随提交信息单独提供（不在公开仓库中公示服务器入口）；运维访问公钥已就位 `authorized_keys`，权限 700/600
+- SSH：登录地址 / 用户名 / 端口不在公开仓库中公示，由**交付渠道单独提供**；运维访问公钥已就位 `authorized_keys`，权限 700/600
 - agent-compose daemon：`127.0.0.1:7410`（仅本机）
 - OctoBus daemon：监听 `172.17.0.1:9000`（docker0 网关地址，仅内网）；**guest 容器内通过 docker 网络服务名访问，即 `http://octobus:9000`**
 - vulnlab 靶场：`172.17.0.1:8081`（仅内网）
@@ -166,8 +166,8 @@ calculator 是本项目最早接进 OctoBus 的能力，本来可以拆掉，留
 - **网关方法级授权**：capset `retester` 白名单到单个方法（ProbeHttp、Subtract）；
 - **Agent 行为边界**：system_prompt 明令禁止端口/目录扫描与路径模糊测试，仅允许调用 capset 授权方法；网关不可达时输出 INCONCLUSIVE 并停止，不降级、不绕行；
 - **探针出口白名单**：retest-probe 实例 config `allowedHosts=["172.17.0.1:8081"]`，fail-closed——白名单外的目标一律拒绝（网关授权之外的第二层出口控制）；
-- **绕网关检测**：Agent（guest，`172.18.0.x`）与 OctoBus 容器（`172.17.0.2`）在靶场日志的 `direct-or-other` 中**零出现**，业务请求全部走网关。日志另有 4 笔 `direct-or-other`，源 IP 为宿主机自身（`172.30.158.34`），是部署期人工探活，非 Agent 行为。该机制只检测、不阻断：宿主机本身具备直连能力，绕过会被标记而非被拒绝。
-- **探针 UA**：固定 `octobus-retest-probe/1.0`，靶场访问日志与 OctoBus 审计日志逐笔可对账，guest 直连靶场会以 `direct-or-other` 标记暴露；
+- **绕网关检测**：Agent（guest，`172.18.0.x`）与 OctoBus 容器（`172.17.0.2`）在靶场日志的 `direct-or-other` 中**零出现**，业务请求全部走网关。日志另有 4 笔 `direct-or-other`，源 IP 为宿主机自身（`172.30.158.34`），是部署期人工探活与人工测试（3 笔 `/healthz` + 1 笔带注入载荷的直连测试），非 Agent 行为。该机制只检测、不阻断：宿主机本身具备直连能力，绕过会被标记而非被拒绝。
+- **探针 UA**：固定 `octobus-retest-probe/1.0`。三方按**时间 / 路由 / 条数**对齐（一轮 7 次网关调用 ↔ 靶场 6 条探针记录，差额是 1 次不落靶场的 `calculator Subtract`）；靶场日志与网关访问日志均**不携带** `business-request-id`（该 ID 仅存于 `evidence/<run_id>/octobus_calls.log`），故不做 ID 级逐笔对齐。guest 直连靶场会以 `direct-or-other` 标记暴露；
 - **端口边界**：三服务均绑定 127.0.0.1 / 172.17.0.1，不对公网暴露；
 - **凭据**：`.env` 不入库；capset token 经 stdin 生成；git 历史经全量扫描无密钥残留（`git log --all -p` 正则 0 命中）。
 

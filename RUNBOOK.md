@@ -56,7 +56,7 @@ cd ~/agent-assessment && ls         (确认新文件落位)
 wc -l src/pipeline.py               (确认 pipeline 非空——防止旧版空文件误传)
 ```
 
-- ✅ 200-300 行（v2 经评审修复后约 270 行）
+- ✅ ≥ 200 行（下限用于拦截旧版空文件误传；本提交 `wc -l src/pipeline.py` 实测 327 行）
 - ❌ 0 行 = 传的是旧包，重传
 
 ```bash
@@ -158,8 +158,8 @@ docker exec octobus octobus logs --capset retester --tail 10   (网关审计)
 sudo tail -10 /var/log/vulnlab.log                (靶场访问日志)
 ```
 
-- ✅ 四验全过：① report 三漏洞判定符合金标准预期；② 证据目录有 probe\_*.json 与 octobus_calls.log；③ 网关审计条目与 calls.log 的 business-request-id 对得上；④ 靶场日志全部带 `octobus-retest-probe` 标记（无 direct-or-other = 无绕网关直连）
-- ❌ 出现 INCONCLUSIVE = 看 report 中 transport_errors/reason 字段定位（网关失败/探针打偏各自有明确原因码）；靶场日志出现 direct-or-other = guest 绕过网关直连，立即回报
+- ✅ 四验全过：① report 三漏洞判定符合金标准预期；② 证据目录有 probe\_*.json 与 octobus_calls.log；③ 网关访问日志按同窗口条数与 calls.log 对齐（calls.log 7 条 ↔ 网关 7 条；网关访问日志不携带 business-request-id，该 ID 仅存于 calls.log）；④ 靶场同窗口 6 条探针记录全部带 `octobus-retest-probe`（比 calls.log 少 1 条，差额为不落靶场的 calculator Subtract），且该窗口内无 direct-or-other
+- ❌ 出现 INCONCLUSIVE = 看 report 中 transport_errors/reason 字段定位（网关失败/探针打偏各自有明确原因码）；靶场日志**新增** direct-or-other（不在此前已知白名单内）且源 IP 属 guest（`172.18.0.x`）才是绕过网关直连，立即回报；已知白名单：部署期 4 笔来自宿主机 `172.30.158.34`（3 笔 `/healthz` + 1 笔人工测试），属正常，不告警
 - ❌ report 中 T1 INCONCLUSIVE 且 transport_errors 含 calculator Subtract 调用失败（2026-09-30 实锤修复）：预置 calculator 包**声明面有 Subtract（proto/service list）但运行时 handler 只注册 Add**（P-09 三层对齐）。修复走**运行时热补丁**（import 同 id upsert 路线被示例包白名单暗桩 importer.go:570「repo root with sdk package not found」判死）：① 从 .bak 重建同风格裸 gRPC 入口（@grpc/grpc-js + proto-loader，含 Health/SERVING），仅新增 subtract handler + 注册；② **入口文件首行必须 shebang**（hardening.go:126 "Runtime entries are shebang scripts"，无 node 兜底）+ chmod 755；③ 服务定义解析用防御式双通道（标准命名空间路径 + 结果树深搜 `.service` 兜底），对库版本行为差异免疫；④ 四层验证：`node --check`（对落位后 .js，勿用 .patched 扩展名）→ `instance restart` health check → `tail stderr.log`（supervisor.go:291 落盘 DataDir/instances/<id>/stderr.log）→ curl 实弹重放期望 `"result":250` + 200。详见 knowledge/03_pitfalls.md P-09/P-10
 
 **完成标志**：四验闭环全绿。**衔接**：证据固化 → Phase 5 自检与自愈实测。

@@ -8,9 +8,6 @@ agents:
     driver:
       docker: {}
     workspace:
-     #provider: git
-     #url: https://gh-proxy.com/https://github.com/VHS1024/agent-assessment.git
-     #ref: main
      provider: file
      mode: mount
      path: .
