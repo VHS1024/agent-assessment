@@ -80,6 +80,29 @@ def test_t1_equal_length_diff_body_inconclusive(rules, monkeypatch):
     assert out["rule_refs"] == ["R-T1-01"]
 
 
+def test_t1_both_empty_body_inconclusive(rules, monkeypatch):
+    # R-3 回归：两探针都返回空响应体（status 200 + 长度 0，sha 同为
+    # e3b0c442…）。ratio==0 且 sha 相等，但绝不能判 PATCHED。
+    monkeypatch.setattr(pipeline.call_octobus, "subtract",
+                        lambda l, r, rid, seq: l - r)
+    e = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    out = pipeline.judge_t1(_probe(length=0, sha=e),
+                            _probe(length=0, sha=e), rules)
+    assert out["verdict"] == "INCONCLUSIVE"
+    assert "len_true=0" in out["metrics"]["reason"]
+    assert out["rule_refs"] == ["R-T1-04"]
+
+
+def test_t1_empty_true_body_inconclusive(rules, monkeypatch):
+    # 真探针为空、假探针非空：比例分母无意义且方向反常
+    monkeypatch.setattr(pipeline.call_octobus, "subtract",
+                        lambda l, r, rid, seq: l - r)
+    out = pipeline.judge_t1(_probe(length=0, sha="e" * 64),
+                            _probe(length=50, sha="f" * 64), rules)
+    assert out["verdict"] == "INCONCLUSIVE"
+    assert out["rule_refs"] == ["R-T1-04"]
+
+
 def test_t1_status_mismatch_inconclusive(rules):
     # 假探针打偏：靶场对无注入标记返回 400 → 状态异常 → INCONCLUSIVE（非 PATCHED）
     out = pipeline.judge_t1(_probe(length=140), _probe(status=400, length=40), rules)

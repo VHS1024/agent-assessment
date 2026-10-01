@@ -16,7 +16,8 @@
     "ratio_threshold": 0.5,
     "expect_status": 200,
     "gray_zone": "INCONCLUSIVE",
-    "note": "双阈值：ratio==0 且 body sha256 相等（逐字节一致）→ PATCHED；>=0.5 → VULNERABLE；其余（含等长但内容不同）→ INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性",
+    "empty_body_rule_id": "R-T1-04",
+    "note": "双阈值：ratio==0 且 body sha256 相等（逐字节一致）→ PATCHED；>=0.5 → VULNERABLE；其余（含等长但内容不同）→ INCONCLUSIVE。靶场对无注入标记的请求返回 400（R-T1-02），探针打偏表现为状态异常而非假阴性；空响应体（真探针长度 0）不构成判定依据，判 INCONCLUSIVE（R-T1-04）",
     "threshold_basis": "实测双峰分离（17 轮一致，证据见 evidence/*/probe_VULN-2026-001_{tautology,contradiction}.json）：未修复态 len(1=1)=72B、len(1=2)=27B，ratio=|delta|/len_true=45/72=0.625，且两响应 sha256 不同；已修复态两响应 sha256 全等、ratio=0。故阈值只需落在开区间 (0, 0.625) 内即可分离两态。取 0.5 的理由：① 位于分离带 0.8 分位，偏保守侧——长度差异不足时倾向 INCONCLUSIVE 转人工，而非贸然判 VULNERABLE；② 敏感性与安全性已回归验证：阈值取 0.05~0.625 结论恒为 VULNERABLE，取 0.63~1.00 恒为 INCONCLUSIVE，任意取值下都不会出现 PATCHED——上调阈值只增加人工复核量，不产生假阳性。",
     "separation_observed": {
       "samples": 17,

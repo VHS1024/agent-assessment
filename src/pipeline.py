@@ -44,7 +44,7 @@ def load_rules() -> dict:
     missing = [k for k, v in required if not v]
     if missing:
         raise SystemExit(f"FATAL rules.json 缺失必需键: {missing}")
-    for key in ("ratio_threshold", "expect_status", "threshold_basis"):
+    for key in ("ratio_threshold", "expect_status", "threshold_basis", "empty_body_rule_id"):
         if key not in raw["t1"]:
             raise SystemExit(f"FATAL rules.json t1 缺失 {key}")
     return raw
@@ -98,7 +98,7 @@ def normalize_probe(probe: dict) -> dict:
 
 
 def judge_t1(probe_true: dict, probe_false: dict, rules: dict) -> dict:
-    """布尔盲注：1=1 与 1=2 响应差异显著 → VULNERABLE；一致 → PATCHED；灰区 → INCONCLUSIVE。"""
+    """布尔盲注：1=1 与 1=2 响应差异显著 → VULNERABLE；一致 → PATCHED；灰区 → INCONCLUSIVE。真探针响应体为空时一律 INCONCLUSIVE（R-T1-04）。"""
     t1 = rules["t1"]
     if _failed(probe_true) or _failed(probe_false):
         return _inconclusive(rules, "R-ERR-01", probe_true, probe_false)
@@ -106,9 +106,20 @@ def judge_t1(probe_true: dict, probe_false: dict, rules: dict) -> dict:
         # 含「探针打偏」：靶场对无注入标记的请求返回 400（R-T1-02），打偏不会伪装成 PATCHED
         return _inconclusive(rules, f"status 非 {t1['expect_status']}",
                              probe_true, probe_false, rule_ref=t1["rule_id"])
-    delta = call_octobus.subtract(probe_true["body_length"], probe_false["body_length"],
-                                  RUN_ID, _next_seq())
-    ratio = round(abs(delta) / max(probe_true["body_length"], 1), 4)
+    len_true = probe_true["body_length"]
+    if len_true == 0:
+        # R-T1-04：真探针响应体为空，比例的分母无意义。旧写法
+        # max(len_true, 1) 兜底除法，恰好把「两个探针都空」凑成
+        # ratio==0 且 sha 同为 e3b0c442…，误判 PATCHED（fail-open）。
+        return _inconclusive(
+            rules,
+            f"真探针响应体为空（len_true={len_true}, "
+            f"len_false={probe_false['body_length']}）："
+            "空响应不构成判定依据",
+            probe_true, probe_false, rule_ref=t1["empty_body_rule_id"])
+    delta = call_octobus.subtract(
+        len_true, probe_false["body_length"], RUN_ID, _next_seq())
+    ratio = round(abs(delta) / len_true, 4)
     # PATCHED 的判据是「响应体逐字节一致」，故必须比对 sha256 而不只是长度：
     # 等长但内容不同（sha 不同）既不是干净修复、也不构成可用注入，转人工而非判 PATCHED。
     same_body = probe_true["body_sha256"] == probe_false["body_sha256"]
