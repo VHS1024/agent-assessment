@@ -42,9 +42,6 @@
 
 **对策（已实现）**：入口脚本 `chmod 755`（本地包已同步 755，重导入不复发）；排障纪律——报错文案里的动词（exec/copy/open）先于假设定位到源码调用点，再对症下药，而不是按「权限问题」直觉轮流撒 chmod。
 
-
-> **现场证据**：`evidence/20260930110008-139/`——该轮 6 次 ProbeHttp 全部成功（status 200/403）但 `octobus_calls.log` 仅 6 行、**无 Subtract**，报告为 INCONCLUSIVE。原因即本坑：网关命名切换后`body_length` 取不到值，`judge_t1` 在减法前抛 KeyError，被 `main()` 兜底捕获。修复即 `normalize_probe()`。
-> **判定意义**：该轮证明失败方向是保守的（报 INCONCLUSIVE 而非误判 PATCHED），与 R-T1-02「探针打偏不得伪装成已修复」同一防线。
 ## P-09 能力声明面 ≠ 运行时实现面：三层对齐才算能力可用
 
 **误判场景**：`capset select-method` 授权 Subtract 成功 → 想当然认为「能调」。实际预置 calculator 包 proto **声明**了 Add+Subtract（service list 可见），但运行时 handler 只注册 Add——每次 Subtract 调用都被实例回 HTTP 400 `unimplemented: The server does not implement the method Subtract`（网关审计 404 NotFound）。授权通过只证明「声明面 ∩ 授权面」非空，「实现面」是独立第三层。
@@ -56,6 +53,21 @@
 **误判场景**：热替换 calculator handler 时，用 `grep -c "CalculatorService/"` 输出 2（Add+Subtract 键都在文件里）判定「修复成功」——随后 `instance restart` 报 `health check failed: connection refused`，实例根本起不来。同一修复链上还连环踩了三个分层陷阱：① 官方示例包是 SDK 模式（require `@chaitin-ai/octobus-sdk`），旧 runtime 是裸 gRPC 模式且无该依赖——「字符串在文件里」≠「依赖可解析」，require 首行即崩；② 跨环境重建文件时丢失首行 shebang（hardening.go 注释原文 "Runtime entries are shebang scripts"，supervisor 直接 `exec.Command(entry)` 无 node 兜底）——755 + 无 shebang = 内核 ENOEXEC「exec format error」；③ `node --check` 对 `.patched` 扩展名报 ERR_UNKNOWN_FILE_EXTENSION——语法检查对象必须是落位后的目标文件名。
 
 **对策（已实现）**：① **四层验证链**——文件层（grep 键存在）→ 语法层（`node --check` 对落位后的 .js）→ 进程层（`instance restart` 的 health check + `tail stderr.log`，supervisor.go:286-298 把进程 stderr 落盘到 `DataDir/instances/<id>/stderr.log`）→ 端到端层（curl 实弹带回显），单层绿不算通；② **真实报错优先**——`logs --instance` 返回的是网关审计流水而非进程 stderr，崩溃栈必须读 stderr.log 或前台手动跑入口脚本；③ **防御式兼容**——跨环境替换代码时避免硬编码库的命名空间挂载路径（如 `proto.grpc.calculator.v1`），改「标准路径优先 + 结果树深搜 `.service` 属性兜底」的双通道解析，对 proto-loader/grpc-js 版本行为差异免疫。延伸视角：与「声明的规则未被实际使用」风险同类——「声明的修复未被端到端验证」，单点证据不能替代链路证据。
+
+## P-11 网关接口命名漂移：契约名 ≠ 运行时名
+
+**现象**：同一份代码、同一个能力包，某些轮次探针响应字段是 `body_length`（proto 声明名），另一些轮次变成 `bodyLength`（protojson lowerCamelCase）。判定器直接索引 `body_length` 取不到值，`judge_t1` 在减法前抛 `KeyError`，被 `main()` 兜底捕获。
+
+**现场证据**：`evidence/20260930110008-139/`——该轮 6 次 ProbeHttp 全部成功（status 200/403），但 `octobus_calls_log` 仅 6 行、**无 Subtract**，报告为 INCONCLUSIVE；原因即本坑。
+
+**定位方法**：不看报告看证据链——`calls` 数与探针数不符（6 vs 7）即说明判定在减法前就断了；再把该轮 evidence 的键名与 proto 声明逐一对齐。
+
+**处置**：`normalize_probe()` 做 camel→snake 的防御式别名（只重排键名，不改数值），判定器只认 proto 声明的 snake_case。**证据文件仍保存网关原样响应**（不人为改写，便于审计对账），归一发生在判定读取时（见 README §7）。
+
+**判定意义**：该轮失败方向是保守的（报 INCONCLUSIVE 而非误判 PATCHED），与 R-T1-02「探针打偏不得伪装成已修复」同一防线。**推论：任何接口适配层的失败都必须落到 INCONCLUSIVE，绝不能落到 PATCHED。**
+
+## P-12 长度/字节一致性可作判据的前提，与不可作判据的字段
+
 **前提一：长度与哈希必须取自「完整响应体」，不能取自 excerpt。**
 `body_excerpt` 只是完整 body 的前 N 字节展示副本；若用 excerpt 长度做判据，当响应体被截断时会掩盖差异 → 假阴性。
 `body_length` 取自 `buf.length`、`body_sha256` 对完整 `buf` 计算，二者共同支撑「逐字节一致」这一强判据。

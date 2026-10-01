@@ -65,7 +65,7 @@ def normalize_probe(probe: dict) -> dict:
 
     OctoBus Connect/JSON 模式按 protojson 规范将 body_length 等字段编码为
     lowerCamelCase（bodyLength）；不同网关/库版本命名不一致（见 03_pitfalls.md
-    P-09「接口契约与实现漂移」）。判定器只认 proto 声明的 snake_case，这里做
+    P-11「网关接口命名漂移：契约名 ≠ 运行时名」）。判定器只认 proto 声明的 snake_case，这里做
     防御式双命名兼容——只重排键名，不改变任何数值来源与判定语义。
     """
     aliases = {

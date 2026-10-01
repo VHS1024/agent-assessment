@@ -161,7 +161,7 @@ calculator 是本项目第一个接入 OctoBus 的能力，**有意保留**，�
 - **探针出口白名单**：retest-probe 实例 config `allowedHosts=["172.17.0.1:8081"]`，fail-closed——白名单外的目标一律拒绝（网关授权之外的第二层出口控制）；
 - **绕网关检测（含实测记录）**：靶场日志中 `direct-or-other` 共 4 笔，源 IP 均为宿主机自身（`172.30.158.34`，`ip -4 addr` 可验），系运维/人工探活（`history` 中可见对应 curl，如 `curl -o /dev/null -w '%{http_code}' '.../api/user?id=1%20AND%201%3D1'`）；Agent（guest，`172.18.0.x`）与 OctoBus 容器（`172.17.0.2`）在 `direct-or-other` 中**零出现**。该机制为「检测」而非「阻断」——宿主机本身具备直连能力，绕过会被标记而非被拒绝。
 - **探针 UA**：固定 `octobus-retest-probe/1.0`，靶场访问日志与 OctoBus 审计日志逐笔可对账，guest 直连靶场会以 `direct-or-other` 标记暴露；
-- **证据格式约定**：`evidence/<run_id>/probe_*.json` 保存**网关原样响应**（Connect/JSON 下遵循 protojson 的 lowerCamelCase 命名，如 `bodyLength`），不做事后改写；判定层读取时经 `normalize_probe()` 归一到 proto 声明的 snake_case（见 `03_pitfalls.md` P-09）。早期轮次（07:25–10:00）因网关命名尚未切换而呈现 snake_case，属同一约定的历史形态。
+- **证据格式约定**：`evidence/<run_id>/probe_*.json` 保存**网关原样响应**（Connect/JSON 下遵循 protojson 的 lowerCamelCase 命名，如 `bodyLength`），不做事后改写；判定层读取时经 `normalize_probe()` 归一到 proto 声明的 snake_case（见 `03_pitfalls.md` P-11）。早期轮次（07:25–10:00）因网关命名尚未切换而呈现 snake_case，属同一约定的历史形态。
 - **端口边界**：三服务均绑定 127.0.0.1 / 172.17.0.1，不对公网暴露；
 - **凭据**：`.env` 不入库；capset token 经 stdin 生成；git 历史经全量扫描无密钥残留（`git log --all -p` 正则 0 命中）。
 
