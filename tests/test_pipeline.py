@@ -276,3 +276,24 @@ def test_two_sha_less_probes_never_patched(rules, monkeypatch):
     b = pipeline.normalize_probe({"status": 200, "bodyLength": 10})
     out = pipeline.judge_t1(a, b, rules)
     assert out["verdict"] == "INCONCLUSIVE"
+
+
+def test_run_id_path_traversal_rejected():
+    # run_id 会成为 evidence/<run_id>/ 的路径分量；未校验时 LLM 可控串可穿越
+    for bad in ("../../etc", "a/b", "..", ".", "", "x" * 65, "测试", "a b"):
+        with pytest.raises(ValueError):
+            pipeline.call_octobus._check_run_id(bad)
+
+
+def test_run_id_accepts_real_run_id_shape():
+    # 正向：管线生成的 RUN_ID（YYYYMMDDhhmmss-NNN）必须原样通过
+    for good in ("20261001060025-159", "run1", "a.b-c_d"):
+        assert pipeline.call_octobus._check_run_id(good) == good
+
+
+def test_append_call_log_rejects_traversal_before_mkdir():
+    # 落盘点自防御：run_id=".." 会让证据落进仓库根，必须在 mkdir 前被拒
+    bogus = pipeline.call_octobus.REPO / "octobus_calls.log"
+    with pytest.raises(ValueError):
+        pipeline.call_octobus._append_call_log("..", {"ok": True})
+    assert not bogus.exists()

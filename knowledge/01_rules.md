@@ -74,7 +74,11 @@
 
 **判据**：`ratio = |len(1=1) − len(1=2)| / len(1=1)`，`ratio ≥ t1.ratio_threshold` 判 VULNERABLE。
 
-**实测分离带**（17 轮采样一致，可复算）：
+**实测分离带**（仓库内 **7 轮有效采样**一致。口径：`status == 200` 且 `bodyLength` 为整数；`status = 0` 的 401 对照轮与空响应体轮均不计入）：
+
+复算命令（直接粘贴，输出应为 `7`）：
+
+    for f in $(git ls-files 'evidence/*/probe_VULN-2026-001_tautology.json'); do python3 -c "import json,sys;j=json.load(open(sys.argv[1]));print('ok' if j.get('status')==200 and isinstance(j.get('bodyLength'),int) else '')" $f; done | grep -c ok
 
 | 靶场状态 | len(1=1) | len(1=2) | ratio | sha256 |
 |---|---|---|---|---|

@@ -1,6 +1,6 @@
 # agent-assessment —— 漏洞复测 Agent（基于 agent-compose + OctoBus）
 
-> 交付基线：agent-compose v2609.4.0 · OctoBus v0.5.0 · 单机部署（阿里云 Ubuntu 22.04）
+> 交付基线：agent-compose v2609.4.0 · OctoBus（commit 25badd7，镜像摘要见 §4.5）· 单机部署（阿里云 Ubuntu 22.04）
 
 ## 1. 项目简介
 
@@ -75,12 +75,16 @@ python3 -m pytest tests/ -q
 
 ## 4.5 从零部署（可复制粘贴）
 
+> 镜像口径：agent-compose 有语义化 tag（`v2609.4.0`，与 `ac version` 自报一致）；
+> OctoBus 上游只发布 `latest`（可变标签），其自报版本为 `main` / commit `25badd7`；
+> 故按 **摘要锁定** 以保证可复现。
+
 ```bash
-# ① OctoBus daemon（named volume 持久化，绑 docker0 网关地址）
+# ① OctoBus daemon（named volume 持久化，绑 docker0 网关地址；镜像按摘要锁定）
 docker run -d --name octobus --restart=always \
   -p 172.17.0.1:9000:9000 \
   -v octobus-data:/var/lib/octobus \
-  ghcr.io/chaitin/octobus:v0.5.0
+  ghcr.io/chaitin/octobus@sha256:377409360a3d54f8e058340a7fb4874a994f18d11d35ba8f7cae0bec23a724a6
 
 # ② 容器内 npm 换国内源（service import 时 daemon 会在容器内 npm install）
 docker exec octobus npm config set registry https://registry.npmmirror.com

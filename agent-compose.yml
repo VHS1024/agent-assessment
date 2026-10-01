@@ -4,7 +4,7 @@ env_file: .env
 agents:
   reviewer:
     provider: codex
-    image: ghcr.io/chaitin/agent-compose-guest:latest
+    image: ghcr.io/chaitin/agent-compose-guest@sha256:a99584629d9fe8c677683cdb6be88578b556a6e04e50abc5f1039424fdbefe73
     driver:
       docker: {}
     workspace:

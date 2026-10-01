@@ -1,1 +1,0 @@
-{"ts": "2026-10-01T11:02:21+0800", "capset": "retester", "instance": "retest-test", "method": "retest.v1.RetestService/ProbeHttp", "business_request_id": "rotchk-CUR-110221-001", "payload_summary": {"url": "http://172.17.0.1:8081/healthz", "method": "GET", "headers": "…", "body": "", "timeoutMs": 8000}, "elapsed_ms": 9.8, "ok": true, "error": ""}

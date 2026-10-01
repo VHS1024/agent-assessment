@@ -13,3 +13,7 @@ __pycache__/
 *.pyc
 
 .pytest_cache/
+
+# 定时轮次会自动产生，仓库只保留人工收录的快照，
+# 避免声明数字随自动增长漂移（收录时用 git add -f）
+/evidence/2*/

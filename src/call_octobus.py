@@ -11,6 +11,7 @@
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -38,9 +39,28 @@ def _token() -> str:
     return tok
 
 
+_RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+
+
+def _check_run_id(run_id: str) -> str:
+    """run_id 将作为 evidence/<run_id>/ 的路径分量，须限定安全 ASCII 标识。
+
+    未校验时两个后果：① 路径穿越（含 .. 或 / 可逃出 evidence/）；
+    ② 非 ASCII 进入 business-request-id 头，鉴权前抛 latin-1 编码错（R-4）。
+    允许集同时挡住空串、超长与 "."/".."（首字符必须是字母或数字）。
+    """
+    if not isinstance(run_id, str) or _RUN_ID_RE.fullmatch(run_id) is None:
+        raise ValueError(
+            "非法 run_id（将作为 evidence/<run_id>/ 的路径分量）："
+            f"{run_id!r}；要求：字母或数字开头，仅含 A-Za-z0-9_.-，长度 1-64"
+        )
+    return run_id
+
+
 def call_method(capset: str, instance: str, method: str, payload: dict,
                 run_id: str, seq: int, timeout: float = 15.0) -> dict:
     """经 Connect 协议（JSON 模式）调用 capset 授权的实例方法。"""
+    _check_run_id(run_id)  # 早于网络与请求头：兼防路径穿越与 latin-1 编码错
     url = f"{_base()}/capsets/{capset}/connect/{instance}/{method}"
     biz_id = f"{run_id}-{seq:03d}"
     body = json.dumps(payload).encode()
@@ -108,6 +128,8 @@ def subtract(left: int, right: int, run_id: str, seq: int) -> int:
 
 
 def _append_call_log(run_id: str, record: dict) -> None:
+    # 落盘点是路径真正成形处，再拦一次：将来新增调用方也绕不过入口校验
+    _check_run_id(run_id)
     d = EVIDENCE_DIR / run_id
     d.mkdir(parents=True, exist_ok=True)
     with open(d / "octobus_calls.log", "a", encoding="utf-8") as fh:

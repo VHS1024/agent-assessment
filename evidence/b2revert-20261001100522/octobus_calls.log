@@ -1,1 +1,0 @@
-{"ts": "2026-10-01T10:05:22+0800", "capset": "retester", "instance": "retest-test", "method": "retest.v1.RetestService/ProbeHttp", "business_request_id": "b2revert-20261001100522-001", "payload_summary": {"url": "http://httpbingo.org/status/200", "method": "GET", "headers": "…", "body": "", "timeoutMs": 8000}, "elapsed_ms": 13.0, "ok": true, "error": ""}
