@@ -48,6 +48,10 @@ sudo tail -10 /var/log/vulnlab.log                              # 靶场访问�
 
 **定时触发**：scheduler 常驻，不需要人工调用。`ac scheduler ls` 可查触发器，`ls evidence/ | tail -5` 能看到每半小时自动落盘的留痕。
 
+> **在服务器上 `git status` 会看到 `outputs/report.json`、`outputs/summary.md` 有未提交改动** —— 这是常驻 scheduler
+> 每半小时自动跑一轮、覆盖输出的结果，属设计使然，**不是交付时的未提交改动**。判据：`git diff --stat` 只涉及
+> `outputs/` 这两个文件；且 **`git clone` 出来的目录里 `git status` 是 clean 的**。
+
 **预期结果**：`VULN-2026-001 → VULNERABLE`（盲注未修复）、`VULN-2026-002 → SURFACE_PATCH`（WAF 只拦关键字，变体仍反射）、`VULN-2026-003 → PATCHED`（统一 403 逐字节一致）。
 
 ## 3.5 单元测试（离线可跑）
