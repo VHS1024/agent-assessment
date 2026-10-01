@@ -88,10 +88,22 @@ def probe_http(url: str, run_id: str, seq: int, method: str = "GET",
 
 
 def subtract(left: int, right: int, run_id: str, seq: int) -> int:
-    """确定性差值计算经网关留审计（5.1.2：可确定性计算不由 LLM 估算）。"""
+    """确定性差值计算经网关留审计（5.1.2：可确定性计算不由 LLM 估算）。
+
+    protojson 省略零值字段（03_pitfalls.md P-13）：差值为 0 时网关返回空对象 {}，
+    此时 result 缺键在语义上等价于 0，而 delta==0 恰是 T1 的 PATCHED 分支入口。
+    但「非空且无 result」只可能是异常形状——那种情况也当 0 会在无法比对时凑出
+    ratio=0 并误判 PATCHED（fail-open），故显式报错交由上层降级为 INCONCLUSIVE。
+    """
     r = call_method("retester", "calculator-test",
                     "calculator.v1.CalculatorService/Subtract",
                     {"left": left, "right": right}, run_id, seq)
+    if "result" not in r:
+        if r:
+            raise RuntimeError(
+                "Subtract 响应形状异常（非空但无 result）: "
+                + json.dumps(r, ensure_ascii=False)[:200])
+        return 0
     return int(r["result"])
 
 

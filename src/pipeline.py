@@ -78,6 +78,21 @@ def normalize_probe(probe: dict) -> dict:
     for camel, snake in aliases.items():
         if snake not in out and camel in out:
             out[snake] = out[camel]
+    # protojson 零值省略（03_pitfalls.md P-13）：下列字段的「缺键」语义上等价于
+    # proto3 零值，补齐以保证判定器取值不崩。实测空响应体（/status/200）时网关
+    # 只回 bodySha256/elapsedMs/headers/status，缺的正是 bodyLength(0) 与 bodyExcerpt("")。
+    out.setdefault("status", 0)
+    out.setdefault("body_length", 0)
+    out.setdefault("body_excerpt", "")
+    out.setdefault("elapsed_ms", 0)
+    out.setdefault("headers", {})
+    # body_sha256 是例外：实测空响应体仍返回 e3b0c442…（sha256 恒为 64 位非空串），
+    # 「缺 sha」只可能来自异常响应，不能按零值补成 ""——否则两个都没有哈希的探针会
+    # 互相判等并凑出 PATCHED（fail-open）。此处转为显式失败，由各判定器首行的
+    # _failed() 短路为 INCONCLUSIVE（fail-closed）。
+    if not str(out.get("body_sha256") or "").strip() and not out.get("error"):
+        out["error"] = ("MALFORMED_PROBE: 响应缺少 body_sha256"
+                        "（超出 protojson 零值省略的异常形状）")
     out.setdefault("error", "")
     return out
 

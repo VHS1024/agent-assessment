@@ -186,3 +186,70 @@ def test_probe_matrix_gateway_failure_degrades(monkeypatch):
 def test_probe_matrix_unknown_type():
     with pytest.raises(SystemExit):
         pipeline.probe_matrix({"endpoint": "http://x", "type": "unknown_kind"})
+
+
+# ── P-13 零值省略回归（桩位必须落在 HTTP 边界 call_method，不得桩 subtract 本身）──
+
+def test_subtract_zero_delta_from_empty_object(monkeypatch):
+    # 实测 Subtract(18,18) 网关返回 {}（protojson 省略 result=0）。
+    # 这里的桩位刻意放在 call_method 而非 subtract：此前 test_t1_patched_identical
+    # 打桩在 subtract 上，恰好绕开了被测逻辑，导致该缺陷在单测层不可见。
+    monkeypatch.setattr(pipeline.call_octobus, "call_method", lambda *a, **k: {})
+    assert pipeline.call_octobus.subtract(18, 18, "t", 1) == 0
+
+
+def test_subtract_nonzero(monkeypatch):
+    monkeypatch.setattr(pipeline.call_octobus, "call_method", lambda *a, **k: {"result": 45})
+    assert pipeline.call_octobus.subtract(45, 0, "t", 1) == 45
+
+
+def test_subtract_malformed_shape_raises(monkeypatch):
+    # 非空且无 result = 异常形状，不得当 0——当 0 会在 T1 凑出假 PATCHED
+    monkeypatch.setattr(pipeline.call_octobus, "call_method", lambda *a, **k: {"code": "internal"})
+    with pytest.raises(RuntimeError):
+        pipeline.call_octobus.subtract(18, 18, "t", 1)
+
+
+def test_t1_patched_via_real_subtract(rules, monkeypatch):
+    # 端到端零值路径：judge_t1 → 真实 subtract → 桩在 call_method
+    monkeypatch.setattr(pipeline.call_octobus, "call_method", lambda *a, **k: {})
+    out = pipeline.judge_t1(pipeline.normalize_probe(_probe(length=100)),
+                            pipeline.normalize_probe(_probe(length=100)), rules)
+    assert out["verdict"] == "PATCHED"
+    assert out["metrics"]["delta"] == 0
+
+
+def test_normalize_probe_fills_zero_value_fields():
+    # 实测 /status/200 空响应体的网关形状：bodyLength / bodyExcerpt 被省略
+    raw = {"status": 200, "headers": {},
+           "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+           "elapsedMs": 3}
+    out = pipeline.normalize_probe(raw)
+    assert out["body_length"] == 0
+    assert out["body_excerpt"] == ""
+    assert out["error"] == ""
+
+
+def test_t1_empty_body_not_patched(rules, monkeypatch):
+    # 空响应体（bodyLength 缺键）不得崩，且必须仍按长度差判定
+    monkeypatch.setattr(pipeline.call_octobus, "subtract", lambda l, r, rid, seq: l - r)
+    empty = pipeline.normalize_probe({"status": 200, "headers": {}, "bodySha256": "e" * 64, "elapsedMs": 1})
+    full = pipeline.normalize_probe(_probe(length=18, sha="f" * 64))
+    out = pipeline.judge_t1(full, empty, rules)
+    assert out["verdict"] == "VULNERABLE"
+    assert out["metrics"]["ratio"] == 1.0
+
+
+def test_normalize_probe_missing_sha_is_failure():
+    # 缺 body_sha256 不得补成 ""（fail-open 风险），须转为显式失败
+    out = pipeline.normalize_probe({"status": 200, "headers": {}, "bodyLength": 10})
+    assert out["error"].startswith("MALFORMED_PROBE")
+
+
+def test_two_sha_less_probes_never_patched(rules, monkeypatch):
+    # fail-open 反证：两个都缺 sha 的探针绝不能被判成「逐字节一致 = PATCHED」
+    monkeypatch.setattr(pipeline.call_octobus, "subtract", lambda l, r, rid, seq: l - r)
+    a = pipeline.normalize_probe({"status": 200, "bodyLength": 10})
+    b = pipeline.normalize_probe({"status": 200, "bodyLength": 10})
+    out = pipeline.judge_t1(a, b, rules)
+    assert out["verdict"] == "INCONCLUSIVE"
