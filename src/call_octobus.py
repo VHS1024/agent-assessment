@@ -34,7 +34,9 @@ def _load_env_fallback():
             continue
         key, _, value = line.partition("=")
         key, value = key.strip(), value.strip()
-        if key:
+        # 只接受本项目的配置键：.env 里若混入其它变量名（如 PYTHONPATH），
+        # 会被写进进程环境并可能影响后续子进程——这里做一层前缀收窄（纵深防御）
+        if key.startswith("OCTOBUS_"):
             os.environ[key] = value.strip('"').strip("'").strip('`')
 
 _load_env_fallback()

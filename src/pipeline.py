@@ -11,7 +11,6 @@
      stdout 打印摘要供 Agent 撰写 summary.md。
 """
 
-import hashlib
 import json
 import os
 import sys
