@@ -1,6 +1,6 @@
 # agent-assessment —— 漏洞复测 Agent（基于 agent-compose + OctoBus）
 
-> 交付基线：agent-compose v2609.4.0 · OctoBus（commit 25badd7，镜像摘要见 §4.5）· 单机部署（阿里云 Ubuntu 22.04）
+> 交付基线：agent-compose v2609.4.0 · OctoBus（commit 25badd7，镜像摘要见 4.5 节）· 单机部署（阿里云 Ubuntu 22.04）
 
 ## 1. 项目简介
 
@@ -13,6 +13,8 @@
 | pipeline.py（确定性脚本） | 全部判定逻辑 | 判据唯一来源 knowledge/rules.json，启动加载、缺失即 Fatal |
 
 判定逻辑我没有交给模型：取数、比对、算比例全在 `src/pipeline.py` 里，判据写在 `knowledge/rules.json`，LLM 只负责读记录和调度。同一份输入跑多少次，结论都一样。
+
+> 分层架构与数据流、三层职责划分见 **docs/architecture.md**。
 
 ## 2. 登录信息
 
@@ -46,10 +48,10 @@ docker exec octobus octobus logs --capset retester --tail 10   # 网关审计
 sudo tail -10 /var/log/vulnlab.log                              # 靶场访问日志（UA 可见探针来源）
 ```
 
-**定时触发**：scheduler 常驻，不需要人工调用。`ac scheduler ls` 可查触发器，`ls evidence/ | tail -5` 能看到每半小时自动落盘的留痕。
+**定时触发**：scheduler 常驻，不需要人工调用。`ac scheduler ls` 可查触发器（`cron: "0 * * * *"`，每小时整点，Asia/Shanghai），`ls evidence/ | tail -5` 能看到每小时自动落盘的留痕。
 
 > **在服务器上 `git status` 会看到 `outputs/report.json`、`outputs/summary.md` 有未提交改动** —— 这是常驻 scheduler
-> 每半小时自动跑一轮、覆盖输出的结果，属设计使然，**不是交付时的未提交改动**。判据：`git diff --stat` 只涉及
+> 每小时自动跑一轮、覆盖输出的结果，属设计使然，**不是交付时的未提交改动**。判据：`git diff --stat` 只涉及
 > `outputs/` 这两个文件；且 **`git clone` 出来的目录里 `git status` 是 clean 的**。
 
 **预期结果**：`VULN-2026-001 → VULNERABLE`（盲注未修复）、`VULN-2026-002 → SURFACE_PATCH`（WAF 只拦关键字，变体仍反射）、`VULN-2026-003 → PATCHED`（统一 403 逐字节一致）。
@@ -134,14 +136,19 @@ cd ~/agent-assessment && ac up
 agent-assessment/
 ├── agent-compose.yml          # Agent 定义（provider/driver/workspace/env/scheduler）
 ├── RUNBOOK.md                 # 实施运行手册（Phase 2-6，逐条命令+成功/异常判据）
+├── docs/architecture.md       # 架构说明（分层架构与数据流、三层职责划分、端口与暴露面）
+├── Dockerfile                 # 考核兼容性 Python 运行时（代码由 agent-compose 挂载；CI 会构建校验）
+├── .github/workflows/ci.yml   # CI：单测 + rules.json 校验 + 镜像构建
 ├── .env.example               # 环境变量模板（仅变量名，无真实令牌；.env 不入库）
 ├── requirements.txt           # 单测依赖（pytest，仅开发期需要）
 ├── .env                       # OCTOBUS_BASE_URL / OCTOBUS_TOKEN_RETESTER（不入库）
 ├── services/retest-probe/     # 自研 OctoBus 能力包：受控 HTTP 探针
 │   ├── service.json           #   包清单（schema chaitin.octobus.service.v1）
+│   ├── package.json           #   依赖声明（@chaitin-ai/octobus-sdk）
 │   ├── proto/retest.proto     #   ProbeHttp 能力契约（status/length/sha256/excerpt/error）
 │   ├── bin/probe.js           #   实现：出口白名单 fail-closed，只测量不判定
-│   └── config.schema.json     #   allowedHosts 出口白名单
+│   ├── config.schema.json     #   allowedHosts 出口白名单
+│   └── secret.schema.json     #   密钥字段声明（本包未使用）
 ├── vulnlab/                   # 三态靶场（宿主机 systemd 服务，非容器）
 ├── src/
 │   ├── call_octobus.py        # 网关统一调用客户端（Bearer + business-request-id + 调用留痕）
@@ -166,6 +173,8 @@ calculator 是本项目最早接进 OctoBus 的能力，本来可以拆掉，留
 
 
 ## 7. 安全边界
+
+> OctoBus 承担的是安全控制（方法级授权、探针出口白名单、审计留痕），不承担安全判定；三态结论由 `src/pipeline.py` 产出。详见 **docs/architecture.md** 第 2 节。
 
 - **网关方法级授权**：capset `retester` 白名单到单个方法（ProbeHttp、Subtract）；
 - **Agent 行为边界**：system_prompt 明令禁止端口/目录扫描与路径模糊测试，仅允许调用 capset 授权方法；网关不可达时输出 INCONCLUSIVE 并停止，不降级、不绕行；
