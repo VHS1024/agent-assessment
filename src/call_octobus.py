@@ -19,7 +19,12 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 def _load_env_fallback():
-    """兼容宿主机直接运行：若环境变量缺失，尝试从 .env 文件加载（纯标准库实现）。"""
+    """兼容宿主机直接运行：模块导入时从 .env 加载配置（纯标准库实现）。
+
+    注：对同名环境变量是「覆盖」而非「仅补缺」，使宿主机直跑与 guest 容器内走同一条
+    取值路径；代价是 guest 内 agent-compose 注入的同名变量会被 .env 覆盖——两处不
+    一致时以 .env 为准，故改完 .env 必须重跑 `ac up`（见 03_pitfalls.md P-17）。
+    """
     env_path = REPO / ".env"
     if not env_path.exists():
         return
