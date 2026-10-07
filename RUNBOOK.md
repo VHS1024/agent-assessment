@@ -115,6 +115,7 @@ docker exec octobus octobus capset list-methods retester                   (核�
 
 - ✅ 最后一条列出恰好两条方法绑定（ProbeHttp + Subtract）
 - ❌ select-method 报方法不存在 = 包没导成功，回 import 步骤
+- ❌ `add-instance` 报实例不存在 = `calculator-test` 未就位（该实例用**上游示例包** `examples/calculator-js`，非本仓库内容），先按 README §4.5 第 ⑤ 步建好再执行本段
 
 ```bash
 TOKEN=$(openssl rand -hex 24)   (明文先生成到 shell 变量——add-token 不生成令牌，只把调用方提供的 secret 注册进 daemon；回执永远打码 ******，明文必须自己留底)

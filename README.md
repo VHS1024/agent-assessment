@@ -53,6 +53,9 @@ sudo tail -10 /var/log/vulnlab.log                              # 靶场访问�
 > **在服务器上 `git status` 会看到 `outputs/report.json`、`outputs/summary.md` 有未提交改动** —— 这是常驻 scheduler
 > 每小时自动跑一轮、覆盖输出的结果，属设计使然，**不是交付时的未提交改动**。判据：`git diff --stat` 只涉及
 > `outputs/` 这两个文件；且 **`git clone` 出来的目录里 `git status` 是 clean 的**。
+>
+> 运行产物的时间戳取自 guest 容器本地时区（UTC），形如 `2026-10-01T08:00:06+0000`；
+> scheduler 的 `timezone: Asia/Shanghai` 只作用于触发时刻的解析，不影响产物内的时间戳。
 
 **预期结果**：`VULN-2026-001 → VULNERABLE`（盲注未修复）、`VULN-2026-002 → SURFACE_PATCH`（WAF 只拦关键字，变体仍反射）、`VULN-2026-003 → PATCHED`（统一 403 逐字节一致）。
 
@@ -83,7 +86,9 @@ python3 -m pytest tests/ -q
 
 > 镜像口径：agent-compose 有语义化 tag（`v2609.4.0`，与 `ac version` 自报一致）；
 > OctoBus 上游只发布 `latest`（可变标签），其自报版本为 `main` / commit `25badd7`；
-> 故按 **摘要锁定** 以保证可复现。
+> 故按 **摘要锁定** 以保证可复现。guest 运行时镜像同理按摘要锁定——所钉摘要对应上游
+> `agent-compose-guest:latest`（上游 guest 镜像的语义化 tag 与 daemon 版本不同步发布），
+> 因此 runtime 侧只写摘要、不写 tag。
 
 ```bash
 # ① OctoBus daemon（named volume 持久化，绑 docker0 网关地址；镜像按摘要锁定）
@@ -104,29 +109,37 @@ docker exec octobus octobus instance create retest-test --service retest-probe \
   --config-json '{"allowedHosts":["172.17.0.1:8081"]}' --no-start
 docker exec octobus octobus instance start retest-test
 
-# ⑤ 创建 capset：方法级最小授权（探针全量 + calculator 仅 Subtract）
+# ⑤ calculator 链路（上游示例包，非本仓库内容；保留理由见 §6）
+#    包来源：上游 OctoBus 仓库 examples/calculator-js，导入为服务 ID calculator
+docker cp <上游 OctoBus 仓库>/examples/calculator-js octobus:/tmp/calculator-js
+docker exec octobus octobus service import calculator /tmp/calculator-js
+docker exec octobus octobus instance create calculator-test --service calculator \
+  --config-json '{"label":"primary"}' --secret-json '{"apiToken":"runtime-secret"}' --no-start
+docker exec octobus octobus instance start calculator-test
+
+# ⑥ 创建 capset：方法级最小授权（探针全量 + calculator 仅 Subtract）
 docker exec octobus octobus capset create retester --name "Retest Agent"
 docker exec octobus octobus capset add-instance retester retest-test --no-all-methods
 docker exec octobus octobus capset select-method retester retest-test retest.v1.RetestService/ProbeHttp
 docker exec octobus octobus capset add-instance retester calculator-test --no-all-methods
 docker exec octobus octobus capset select-method retester calculator-test calculator.v1.CalculatorService/Subtract
 
-# ⑥ 生成访问令牌（stdin 方式，不落 shell history）
+# ⑦ 生成访问令牌（stdin 方式，不落 shell history）
 openssl rand -hex 24 | docker exec -i octobus octobus capset add-token retester retester-agent --name "assessment agent" --token-stdin
 
-# ⑦ 靶场安装（宿主机 systemd，非容器）
+# ⑧ 靶场安装（宿主机 systemd，非容器）
 sudo mkdir -p /opt/vulnlab
 sudo cp vulnlab/vulnlab.py /opt/vulnlab/vulnlab.py
 sudo cp vulnlab/vulnlab.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now vulnlab
 
-# ⑧ 项目层 .env（两键，令牌来自 ⑥；示例见 .env.example）
+# ⑨ 项目层 .env（两键，令牌来自 ⑦；示例见 .env.example）
 cat > .env <<'EOF'
 OCTOBUS_BASE_URL=http://octobus:9000
 OCTOBUS_TOKEN_RETESTER=<粘贴⑥生成的令牌>
 EOF
 
-# ⑨ 应用项目并跑通一轮
+# ⑩ 应用项目并跑通一轮
 cd ~/agent-assessment && ac up
 ```
 
