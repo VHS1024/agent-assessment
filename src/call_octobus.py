@@ -18,6 +18,21 @@ import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+def _load_env_fallback():
+    """兼容宿主机直接运行：若环境变量缺失，尝试从 .env 文件加载（纯标准库实现）。"""
+    env_path = REPO / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if key:
+            os.environ[key] = value.strip('"').strip("'").strip('`')
+
+_load_env_fallback()
 EVIDENCE_DIR = REPO / "evidence"
 
 def _base() -> str:
