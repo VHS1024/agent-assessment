@@ -192,7 +192,8 @@ calculator 是本项目最早接进 OctoBus 的能力，本来可以拆掉，留
 - **网关方法级授权**：capset `retester` 白名单到单个方法（ProbeHttp、Subtract）；
 - **Agent 行为边界**：system_prompt 明令禁止端口/目录扫描与路径模糊测试，仅允许调用 capset 授权方法；网关不可达时输出 INCONCLUSIVE 并停止，不降级、不绕行；
 - **探针出口白名单**：retest-probe 实例 config `allowedHosts=["172.17.0.1:8081"]`，fail-closed——白名单外的目标一律拒绝（网关授权之外的第二层出口控制）；
-- **绕网关检测**：Agent（guest，`172.18.0.x`）与 OctoBus 容器（`172.17.0.2`）在靶场日志的 `direct-or-other` 中**零出现**，业务请求全部走网关。日志另有 4 笔 `direct-or-other`，源 IP 为宿主机自身（`172.30.158.34`），是部署期人工探活与人工测试（3 笔 `/healthz` + 1 笔带注入载荷的直连测试），非 Agent 行为。该机制只检测、不阻断：宿主机本身具备直连能力，绕过会被标记而非被拒绝。
+- **绕网关检测**：靶场按 UA 特征分流——探针固定 `octobus-retest-probe/1.0`，其余一律记为 `direct-or-other`。判定链路的全部请求（6 条探针 + 1 次 calculator Subtract）都经网关，与 `evidence/<run_id>/octobus_calls.log`、网关审计逐条对应，靶场侧无一落在 `direct-or-other`。
+- `direct-or-other` 累计 8 笔，均不在判定链路上：7 笔来自宿主机（`172.30.158.34`），为 6 笔 `/healthz` 与 1 笔 `/api/user?id=1 AND 1=1`，属部署期与后续运维中的人工探活、人工直连验证；1 笔来自 guest 容器（`172.18.0.4`，2026-10-02 15:00:09）的 `GET /`——探针矩阵只有 6 条固定 URL（`src/pipeline.py::probe_matrix`），不含 `/`，该请求也不在任何一轮的 `octobus_calls.log` 中。该机制只检测、不阻断：宿主机本身具备直连能力，绕过会被标记而非被拒绝。
 - **探针 UA**：固定 `octobus-retest-probe/1.0`。三方按**时间 / 路由 / 条数**对齐（一轮 7 次网关调用 ↔ 靶场 6 条探针记录，差额是 1 次不落靶场的 `calculator Subtract`）；靶场日志与网关访问日志均**不携带** `business-request-id`（该 ID 仅存于 `evidence/<run_id>/octobus_calls.log`），故不做 ID 级逐笔对齐。guest 直连靶场会以 `direct-or-other` 标记暴露；
 - **端口边界**：三服务均绑定 127.0.0.1 / 172.17.0.1，不对公网暴露；
 - **凭据**：`.env` 不入库；capset token 经 stdin 生成；git 历史经全量扫描无密钥残留（`git log --all -p` 正则 0 命中）。

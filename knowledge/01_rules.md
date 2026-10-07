@@ -1,6 +1,6 @@
 # 复测判定规则（人类可读版 · 与 rules.json 规则 ID 一一对应）
 
-> 本文档是 `knowledge/rules.json` 的人类可读镜像。**判定以 rules.json 为唯一执行来源**（pipeline 启动加载、缺失即 Fatal）；本文档用于 Agent 阅读理解与人工审计对照。
+> `knowledge/rules.json` 的人类可读镜像。判定以 rules.json 为唯一执行来源（pipeline 启动加载、缺失即 Fatal）；本文件供 Agent 阅读理解与人工审计对照。
 
 ## R-STRIP-01 动态响应头剥离
 
