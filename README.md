@@ -18,7 +18,7 @@
 
 ## 2. 登录信息
 
-- SSH：登录地址 / 用户名 / 端口不在公开仓库中公示，由**交付渠道单独提供**；运维访问公钥已就位 `authorized_keys`，权限 700/600
+- SSH：登录地址 / 用户名 / 端口不在公开仓库中公示，由**交付渠道单独提供**；**考官公钥**已写入 `~/.ssh/authorized_keys`（1 把，ED25519），权限 700/600
 - agent-compose daemon：`127.0.0.1:7410`（仅本机）
 - OctoBus daemon：监听 `172.17.0.1:9000`（docker0 网关地址，仅内网）；**guest 容器内通过 docker 网络服务名访问，即 `http://octobus:9000`**
 - vulnlab 靶场：`172.17.0.1:8081`（仅内网）
@@ -216,9 +216,9 @@ calculator 是本项目最早接进 OctoBus 的能力，本来可以拆掉，留
 
 ## 10. 交付自检清单
 
-- [x] 两套服务重启自愈（docker restart + 整机 reboot 双实测）
-- [x] SSH 公钥落位（权限 700/600）
-- [x] `ac run` 端到端可查询（outputs/report.json + evidence/）
-- [x] 至少一轮完整运行留痕（outputs + evidence + 双侧审计日志）
-- [x] 仓库无明文密钥（历史全量正则扫描 0 命中；token 仅存 .env 与 OctoBus 库）
-- [x] 服务不对公网暴露（ss -tlnp 全部 127.0.0.1 / 172.17.0.1）
+- [x] 两套服务重启后自动恢复，无需人工干预（docker restart + 整机 reboot 双实测）
+- [x] 考官公钥已写入 `~/.ssh/authorized_keys`（1 把，ED25519），权限 700/600
+- [x] 服务器上可查 agent-compose 项目与触发器（`ac scheduler ls`）、OctoBus 能力集与所暴露方法（`octobus capset list-methods retester`）
+- [x] Agent 已完整执行至少一轮并留痕（`outputs/` + `evidence/` + 网关与靶场双侧审计日志）
+- [x] 仓库无明文密钥（历史全量正则扫描 0 命中；token 仅存 `.env` 与 OctoBus 库）
+- [x] 服务不对公网暴露（`ss -tlnp` 全部 127.0.0.1 / 172.17.0.1）
