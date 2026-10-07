@@ -113,7 +113,7 @@
 2. `pipeline.py` 的 `normalize_probe()`：对 `status` / `body_length` / `body_excerpt` / `elapsed_ms` / `headers` 补零值缺省；**`body_sha256` 例外**——缺失即置 `error="MALFORMED_PROBE: ..."`，转入 INCONCLUSIVE。
 3. 回归用例：**桩打在 `call_method`（HTTP 边界），不打在 `subtract`**。
 
-**测试桩位的教训**：原用例在 `subtract` 上打桩，而缺陷恰恰在 `subtract` 内部——**桩把它自己该被测的那一层整个替换掉了**，于是 38 个用例全绿、缺陷照样活着。移到 HTTP 边界后：未打补丁 **7 failed / 39 passed**，打补丁 **46 passed**（本机 python3.12 与服务器 python3.10.12 结果一致）。
+**测试桩位的教训**：原用例在 `subtract` 上打桩，而缺陷恰恰在 `subtract` 内部——**桩把它自己该被测的那一层整个替换掉了**，于是 38 个用例全绿、缺陷照样活着。移到 HTTP 边界后：未打补丁 **7 failed / 39 passed**，打补丁 **46 passed**（本机 python3.12 与服务器 python3.10.12 结果一致）。上述为当次修复节点的计数快照，非当前用例总数——此后用例有增补，以 `pytest tests/ -q` 实测为准。
 
 **判定意义**：本坑的两种失败方向截然不同——`KeyError` 崩掉是**保守的**（INCONCLUSIVE），而「把缺失的 sha 补成空串」是**激进的**（误判 PATCHED）。**修复必须同时消掉这两头**：既不能崩，也不能为了不崩而放宽判据。与 P-11、R-T1-02 同一条防线。
 
