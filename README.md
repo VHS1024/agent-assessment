@@ -14,7 +14,7 @@
 
 判定逻辑我没有交给模型：取数、比对、算比例全在 `src/pipeline.py` 里，判据写在 `knowledge/rules.json`，LLM 只负责读记录和调度。同一份输入跑多少次，结论都一样。
 
-> 分层架构与数据流、三层职责划分见 **docs/architecture.md**。
+> 分层架构与数据流、三层职责划分见 [架构说明](docs/architecture.md)。
 
 ## 2. 登录信息
 
@@ -28,7 +28,7 @@
 
 ## 3. 快速验证（约 10 分钟）
 
-> 逐条命令 + 成功/异常判据的完整实施手册见 **RUNBOOK.md**（Phase 2-6：上传→接线→全链路→自愈实测→推送）。
+> 逐条命令 + 成功/异常判据的完整实施手册见 [RUNBOOK.md](RUNBOOK.md)（Phase 2-6：上传→接线→全链路→自愈实测→推送）。
 
 ```bash
 # ① 靶场存活（systemd 自愈服务）
@@ -109,7 +109,7 @@ docker exec octobus octobus instance create retest-test --service retest-probe \
   --config-json '{"allowedHosts":["172.17.0.1:8081"]}' --no-start
 docker exec octobus octobus instance start retest-test
 
-# ⑤ calculator 链路（上游示例包，非本仓库内容；保留理由见 §6）
+# ⑤ calculator 链路（上游示例包，非本仓库内容；保留理由见第 6 节）
 #    包来源：上游 OctoBus 仓库 examples/calculator-js，导入为服务 ID calculator
 docker cp <上游 OctoBus 仓库>/examples/calculator-js octobus:/tmp/calculator-js
 docker exec octobus octobus service import calculator /tmp/calculator-js
@@ -187,7 +187,7 @@ calculator 是本项目最早接进 OctoBus 的能力，本来可以拆掉，留
 
 ## 7. 安全边界
 
-> OctoBus 承担的是安全控制（方法级授权、探针出口白名单、审计留痕），不承担安全判定；三态结论由 `src/pipeline.py` 产出。详见 **docs/architecture.md** 第 2 节。
+> OctoBus 承担的是安全控制（方法级授权、探针出口白名单、审计留痕），不承担安全判定；三态结论由 `src/pipeline.py` 产出。详见 [架构说明](docs/architecture.md) 第 2 节。
 
 - **网关方法级授权**：capset `retester` 白名单到单个方法（ProbeHttp、Subtract）；
 - **Agent 行为边界**：system_prompt 明令禁止端口/目录扫描与路径模糊测试，仅允许调用 capset 授权方法；网关不可达时输出 INCONCLUSIVE 并停止，不降级、不绕行；

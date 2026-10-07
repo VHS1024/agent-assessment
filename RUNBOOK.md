@@ -115,7 +115,7 @@ docker exec octobus octobus capset list-methods retester                   (核�
 
 - ✅ 最后一条列出恰好两条方法绑定（ProbeHttp + Subtract）
 - ❌ select-method 报方法不存在 = 包没导成功，回 import 步骤
-- ❌ `add-instance` 报实例不存在 = `calculator-test` 未就位（该实例用**上游示例包** `examples/calculator-js`，非本仓库内容），先按 README §4.5 第 ⑤ 步建好再执行本段
+- ❌ `add-instance` 报实例不存在 = `calculator-test` 未就位（该实例用**上游示例包** `examples/calculator-js`，非本仓库内容），先按 README 第 4.5 节第 ⑤ 步建好再执行本段
 
 ```bash
 TOKEN=$(openssl rand -hex 24)   (明文先生成到 shell 变量——add-token 不生成令牌，只把调用方提供的 secret 注册进 daemon；回执永远打码 ******，明文必须自己留底)
@@ -244,4 +244,4 @@ git bundle create /tmp/aa.bundle --all        (服务器：打包全部历史)
 Mac：`scp -P "$SERVER_PORT" "agentadmin@$SERVER_IP:/tmp/aa.bundle" ~/Downloads/`，从 bundle 克隆后用本地网络推送，push 完在服务器 `git fetch` 对齐。
 
 
-**完成标志**：push 成功、GitHub 网页可见最新提交。**收尾衔接**：产出《实施复盘与坑点手册》（坑点时间线 + ADR 决策记录），并反哺 README §9。
+**完成标志**：push 成功、GitHub 网页可见最新提交。**收尾衔接**：坑点时间线与 ADR 决策记录并入 `knowledge/03_pitfalls.md`，并反哺 README 第 9 节。

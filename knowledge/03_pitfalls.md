@@ -62,7 +62,7 @@
 
 **定位方法**：不看报告看证据链——`calls` 数与探针数不符（6 vs 7）即说明判定在减法前就断了；再把该轮 evidence 的键名与 proto 声明逐一对齐。
 
-**处置**：`normalize_probe()` 做 camel→snake 的防御式别名（只重排键名，不改数值），判定器只认 proto 声明的 snake_case。**证据文件仍保存网关原样响应**（不人为改写，便于审计对账），归一发生在判定读取时（见 README §7）。
+**处置**：`normalize_probe()` 做 camel→snake 的防御式别名（只重排键名，不改数值），判定器只认 proto 声明的 snake_case。**证据文件仍保存网关原样响应**（不人为改写，便于审计对账），归一发生在判定读取时（见 README 第 7 节）。
 
 **判定意义**：该轮失败方向是保守的（报 INCONCLUSIVE 而非误判 PATCHED），与 R-T1-02「探针打偏不得伪装成已修复」同一防线。**推论：任何接口适配层的失败都必须落到 INCONCLUSIVE，绝不能落到 PATCHED。**
 
