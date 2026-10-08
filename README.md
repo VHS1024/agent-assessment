@@ -78,7 +78,7 @@ python3 -m pytest tests/ -q
 | VULN-2026-002 反射 XSS | reflection_diff | **表层变更**：`<script>` 被 WAF 403，但 `<img onerror>` 变体仍原样反射 | 双探针：拦截存在 + 变体可达 → SURFACE_PATCH |
 | VULN-2026-003 水平越权 | idem_forge | **已修复**：伪造 Cookie 与普通请求均统一 403、响应逐字节一致 | SHA-256 + 剥离动态头后全等 → PATCHED |
 
-「表层变更」是三态判定的设计要点。有拦截动作不等于修好了，关键是变体还能不能打到漏洞本体：WAF 关键字拦截就是最常见的一种「看起来修了」。判定器还支持第四态 `WAF_FULL_BLOCK`（字面量与变体均被拦）：拦截面完整只是真实修复的必要条件，单列不并入 PATCHED（见 knowledge/01_rules.md R-T2-01）。
+「表层变更」是三态判定的设计要点。有拦截动作不等于修好了，关键是变体还能不能打到漏洞本体：WAF 关键字拦截就是最常见的一种「看起来修了」。判定器还支持第四态 `WAF_FULL_BLOCK`（字面量与变体均被拦）：拦截面完整只是真实修复的必要条件，单列不并入 PATCHED（见 knowledge/01_rules.md R-T2-01）。此外，探不出来或证据不足时统一输出 `INCONCLUSIVE` 转人工；`outputs/report.json` 的 summary 按这五类分别计数。
 
 **证据格式约定**：`evidence/<run_id>/probe_*.json` 保存网关原样响应（Connect/JSON 下遵循 protojson 的 lowerCamelCase 命名，如 `bodyLength`），不做事后改写；判定层读取时经 `normalize_probe()` 归一到 proto 声明的 snake_case（见 `03_pitfalls.md` P-11）。早期轮次（07:25–10:00）因网关命名尚未切换而呈现 snake_case，属同一约定的历史形态。
 
